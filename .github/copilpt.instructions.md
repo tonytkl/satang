@@ -14,6 +14,7 @@ The system is designed to be:
 ### Cloud Provider
 - Use AWS serverless architecture
 - Prefer managed services over self-hosted solutions
+- Free-tier plan eligible is preferable for cost efficiency, but not mandatory
 
 ### Compute
 - All compute logic must be implemented using AWS Lambda

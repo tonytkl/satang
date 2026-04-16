@@ -9,6 +9,7 @@ import "time"
 //	SK = "#METADATA#<ID>"
 //	GSI_PK = "USER_EMAIL#<Email>"
 //	GSI_SK = "USER#<ID>"
+
 type User struct {
 	PK        string    `dynamodbav:"PK"`
 	SK        string    `dynamodbav:"SK"`

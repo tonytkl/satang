@@ -14,7 +14,7 @@ const (
 // Categories are used to classify transactions and can be customized by each user.
 // DynamoDB keys:
 //
-// PK = "CATEGORY#<OwnerID>"
+// PK = "USER#<OwnerID>"
 // SK = "CATEGORY#<ID>"
 // GSI_PK = "CATEGORY#<OwnerID>#TYPE#<Type>"
 // GSI_SK = "CATEGORY#<ID>"
@@ -39,7 +39,7 @@ func categoryGSIKey(ownerID string, categoryType CategoryType) string {
 func NewCategory(id, ownerID, name string, categoryType CategoryType) *Category {
 	now := time.Now().UTC()
 	return &Category{
-		PK:        "CATEGORY#" + ownerID,
+		PK:        "USER#" + ownerID,
 		SK:        "CATEGORY#" + id,
 		GSIPK:     categoryGSIKey(ownerID, categoryType),
 		GSISK:     "CATEGORY#" + id,

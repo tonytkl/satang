@@ -6,8 +6,8 @@ import "time"
 // The wallet lives in its own partition to support multiple members.
 // DynamoDB keys:
 //
-//	PK = "WALLET#<ID>"
-//	SK = "#METADATA#<ID>"
+//	PK = "USER#<OwnerID>"
+//	SK = "WALLET#<ID>"
 //
 // Membership is modelled separately via WalletMember (adjacency list pattern).
 type Wallet struct {
@@ -25,8 +25,8 @@ type Wallet struct {
 func NewWallet(id, ownerID, name, currency string) *Wallet {
 	now := time.Now().UTC()
 	return &Wallet{
-		PK:        "WALLET#" + id,
-		SK:        "#METADATA#" + id,
+		PK:        "USER#" + ownerID,
+		SK:        "WALLET#" + id,
 		ID:        id,
 		OwnerID:   ownerID,
 		Name:      name,

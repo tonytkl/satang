@@ -26,10 +26,28 @@ resource "aws_dynamodb_table" "dynamodb_table" {
     type = "S"
   }
 
+  attribute {
+    name = "GSI2_PK"
+    type = "S"
+  }
+
+  attribute {
+    name = "GSI2_SK"
+    type = "S"
+  }
+
   global_secondary_index {
     name               = "GSI1"
     hash_key           = "GSI_PK"
     range_key          = "GSI_SK"
+    projection_type    = "ALL"
+    read_capacity      = 2
+    write_capacity     = 2
+  }
+  global_secondary_index {
+    name               = "GSI2"
+    hash_key           = "GSI2_PK"
+    range_key          = "GSI2_SK"
     projection_type    = "ALL"
     read_capacity      = 2
     write_capacity     = 2

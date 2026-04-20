@@ -16,15 +16,19 @@ const (
 //
 //		PK = "USER#<UserID>"
 //		SK = "TX#<Date>#<ID>"
-//		GSI_ByCategoryPK = "TX_CATEGORY#<CATEGORY>"
-//		GSI_ByTransactionTypeSK = "TX#<Date>#<ID>"
+//		GSI_ByCategoryPK = "TX_CATEGORY#<CATEGORY_ID>"
+//		GSI_ByCategorySK = "TX#<Date>#<ID>"
+//		GSI_ByWalletPK = "TX_WALLET#<WALLET_ID>"
+//		GSI_ByWalletSK = "TX#<Date>#<ID>"
 //	 	GSI_ByTransactionID = "TX_ID#<ID>"
 type Transaction struct {
 	PK                  string          `dynamodbav:"PK"`
 	SK                  string          `dynamodbav:"SK"`
 	GSI_ByCategoryPK    string          `dynamodbav:"GSI_PK"`
 	GSI_ByCategorySK    string          `dynamodbav:"GSI_SK"`
-	GSI_ByTransactionID string          `dynamodbav:"GSI2_PK"`
+	GSI_ByWalletPK      string          `dynamodbav:"GSI2_PK,omitempty"`
+	GSI_ByWalletSK      string          `dynamodbav:"GSI2_SK,omitempty"`
+	GSI_ByTransactionID string          `dynamodbav:"GSI3_PK,omitempty"`
 	ID                  string          `dynamodbav:"ID"`
 	WalletID            string          `dynamodbav:"WalletID"`
 	WalletName          string          `dynamodbav:"WalletName,omitempty"`
@@ -33,7 +37,7 @@ type Transaction struct {
 	Currency            string          `dynamodbav:"Currency"`
 	CategoryID          string          `dynamodbav:"CategoryID"`
 	CategoryName        string          `dynamodbav:"CategoryName,omitempty"`
-	Description         *string         `dynamodbav:"Description"`
+	Description         *string         `dynamodbav:"Description,omitempty"`
 	Date                time.Time       `dynamodbav:"Date"`
 	ImageURL            *string         `dynamodbav:"ImageURL,omitempty"`
 	OwnerID             string          `dynamodbav:"OwnerID"`
@@ -49,6 +53,8 @@ func NewTransaction(id, walletID, walletName, categoryID, categoryName, descript
 		SK:                  "TX#" + dateStr + "#" + id,
 		GSI_ByCategoryPK:    "TX_CATEGORY#" + string(categoryID),
 		GSI_ByCategorySK:    "TX#" + dateStr + "#" + id,
+		GSI_ByWalletPK:      "TX_WALLET#" + string(walletID),
+		GSI_ByWalletSK:      "TX#" + dateStr + "#" + id,
 		GSI_ByTransactionID: "TX_ID#" + id,
 		ID:                  id,
 		WalletID:            walletID,

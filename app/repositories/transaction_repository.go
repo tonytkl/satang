@@ -39,10 +39,18 @@ func (repository *transactionRepository) Create(ctx context.Context, transaction
 	if err := validateTransaction(transaction); err != nil {
 		return err
 	}
-
+	sortingKey := utils.GetSortingKey("TX", transaction.Date, transaction.ID)
 	transaction.ID = utils.GetUUID()
 	transaction.PK = utils.GetPartitionKey("WALLET", transaction.WalletID)
-	transaction.SK = utils.GetSortingKey("TX", transaction.Date, transaction.ID)
+	transaction.SK = sortingKey
+
+	transaction.GSI_ByCategoryPK = utils.GetPartitionKey("TX_CATEGORY", transaction.CategoryID)
+	transaction.GSI_ByCategorySK = sortingKey
+
+	transaction.GSI_ByWalletPK = utils.GetPartitionKey("TX_WALLET", transaction.WalletID)
+	transaction.GSI_ByWalletSK = sortingKey
+
+	transaction.GSI_ByTransactionID = "TX_ID#" + transaction.ID
 
 	if transaction.CreatedAt.IsZero() {
 		transaction.CreatedAt = time.Now().UTC()
@@ -71,9 +79,9 @@ func (repository *transactionRepository) GetByKey(ctx context.Context, transacti
 	err := repository.db.QueryItems(
 		ctx,
 		repository.tableName,
-		"GSI2_PK = :pk",
+		"GSI3_PK = :pk",
 		expression,
-		"GSI2",
+		"GSI3",
 		transactions)
 
 	if err != nil {

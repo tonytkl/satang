@@ -11,14 +11,15 @@ import (
 	"github.com/tonytkl/satang/utils"
 )
 
+// ErrTransactionNotFound is returned when no transaction matches the query.
 var ErrTransactionNotFound = errors.New("transaction not found")
 
+// TransactionRepository defines persistence operations for transactions.
 type TransactionRepository interface {
 	Create(ctx context.Context, transaction *model.Transaction) error
-	GetByKey(ctx context.Context, transactionID string) (*model.Transaction, error)
-	ListByWallet()
-	ListByCategory()
+	ListByGSI(ctx context.Context, windexName string, indexPartitionKeyPrefix string, targetID string) ([]model.Transaction, error)
 	ListWithinDateRange()
+	GetByKey(ctx context.Context, id string) (*model.Transaction, error)
 	Update()
 	Delete()
 }
@@ -28,6 +29,7 @@ type transactionRepository struct {
 	tableName string
 }
 
+// NewTransactionRepository creates a transaction repository backed by DynamoDB.
 func NewTransactionRepository(db clients.DynamoDBClient, tableName string) TransactionRepository {
 	return &transactionRepository{
 		db:        db,
@@ -35,6 +37,7 @@ func NewTransactionRepository(db clients.DynamoDBClient, tableName string) Trans
 	}
 }
 
+// Create stores a transaction and populates its derived keys and timestamps.
 func (repository *transactionRepository) Create(ctx context.Context, transaction *model.Transaction) error {
 	if err := validateTransaction(transaction); err != nil {
 		return err
@@ -67,22 +70,29 @@ func (repository *transactionRepository) Create(ctx context.Context, transaction
 	return nil
 }
 
-func (repository *transactionRepository) GetByKey(ctx context.Context, transactionID string) (*model.Transaction, error) {
-	if transactionID == "" {
-		return nil, errors.New("Transaction ID is required")
+// ListByGSI lists transactions using the provided GSI name and partition key prefix.
+func (repository *transactionRepository) ListByGSI(ctx context.Context, indexName string, indexPartitionKeyPrefix string, targetID string) ([]model.Transaction, error) {
+	if targetID == "" || indexName == "" || indexPartitionKeyPrefix == "" {
+		return nil, errors.New("index name, index partition key prefix, and target ID are required")
+	}
+
+	indexPartitionKeyField, err := getIndexPartitionKeyField(indexName)
+	if err != nil {
+		return nil, err
 	}
 
 	transactions := []model.Transaction{}
-	expression := map[string]any{
-		":pk": utils.GetPartitionKey("TX_ID", transactionID),
-	}
-	err := repository.db.QueryItems(
+
+	err = repository.db.QueryItems(
 		ctx,
 		repository.tableName,
-		"GSI3_PK = :pk",
-		expression,
-		"GSI3",
-		transactions)
+		indexPartitionKeyField+" = :pk",
+		map[string]any{
+			":pk": utils.GetPartitionKey(indexPartitionKeyPrefix, targetID),
+		},
+		indexName,
+		&transactions,
+	)
 
 	if err != nil {
 		return nil, fmt.Errorf("query transaction by ID: %w", err)
@@ -92,29 +102,39 @@ func (repository *transactionRepository) GetByKey(ctx context.Context, transacti
 		return nil, ErrTransactionNotFound
 	}
 
-	return &transactions[0], nil
+	return transactions, nil
 }
 
-func (repository *transactionRepository) ListByWallet() {
-
-}
-
-func (repository *transactionRepository) ListByCategory() {
-
-}
-
+// ListWithinDateRange lists transactions within a date range.
 func (repository *transactionRepository) ListWithinDateRange() {
 
 }
 
+func (repository *transactionRepository) GetByKey(ctx context.Context, id string) (*model.Transaction, error) {
+	if id == "" {
+		return nil, errors.New("ID is required")
+	}
+
+	transactions, err := repository.ListByGSI(ctx, "GSI3_PK", "GSI_3", id)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &transactions[0], nil
+}
+
+// Update modifies an existing transaction.
 func (repository *transactionRepository) Update() {
 
 }
 
+// Delete removes an existing transaction.
 func (repository *transactionRepository) Delete() {
 
 }
 
+// validateTransaction ensures the required transaction fields are present.
 func validateTransaction(transaction *model.Transaction) error {
 	if transaction == nil {
 		return errors.New("Transaction is required")
@@ -141,4 +161,18 @@ func validateTransaction(transaction *model.Transaction) error {
 	}
 
 	return nil
+}
+
+// getIndexPartitionKeyField resolves a GSI name to its partition key attribute.
+func getIndexPartitionKeyField(indexName string) (string, error) {
+	switch indexName {
+	case "GSI1":
+		return "GSI_PK", nil
+	case "GSI2":
+		return "GSI2_PK", nil
+	case "GSI3":
+		return "GSI3_PK", nil
+	default:
+		return "", fmt.Errorf("unsupported index name: %s", indexName)
+	}
 }

@@ -113,3 +113,4 @@ When generating code:
 - Generate Terraform for infrastructure unless specified otherwise
 - Keep Go code modular and production-ready
 - Avoid introducing unnecessary frameworks or heavy dependencies
+- Update READEME.md with any new features or architectural changes

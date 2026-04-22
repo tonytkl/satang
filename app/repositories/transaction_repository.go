@@ -17,8 +17,8 @@ var ErrTransactionNotFound = errors.New("transaction not found")
 // TransactionRepository defines persistence operations for transactions.
 type TransactionRepository interface {
 	Create(ctx context.Context, transaction *model.Transaction) error
-	ListByGSI(ctx context.Context, windexName string, indexPartitionKeyPrefix string, targetID string) ([]model.Transaction, error)
-	ListWithinDateRange()
+	ListByGSI(ctx context.Context, indexName string, indexPartitionKeyPrefix string, targetID string, ownerID string, fromDate *time.Time, toDate *time.Time) ([]model.Transaction, error)
+	ListWithinDateRange(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time) ([]model.Transaction, error)
 	GetByKey(ctx context.Context, id string) (*model.Transaction, error)
 	Update()
 	Delete()
@@ -44,7 +44,7 @@ func (repository *transactionRepository) Create(ctx context.Context, transaction
 	}
 	sortingKey := utils.GetSortingKey("TX", transaction.Date, transaction.ID)
 	transaction.ID = utils.GetUUID()
-	transaction.PK = utils.GetPartitionKey("WALLET", transaction.WalletID)
+	transaction.PK = utils.GetPartitionKey("USER", transaction.OwnerID)
 	transaction.SK = sortingKey
 
 	transaction.GSI_ByCategoryPK = utils.GetPartitionKey("TX_CATEGORY", transaction.CategoryID)
@@ -71,7 +71,7 @@ func (repository *transactionRepository) Create(ctx context.Context, transaction
 }
 
 // ListByGSI lists transactions using the provided GSI name and partition key prefix.
-func (repository *transactionRepository) ListByGSI(ctx context.Context, indexName string, indexPartitionKeyPrefix string, targetID string) ([]model.Transaction, error) {
+func (repository *transactionRepository) ListByGSI(ctx context.Context, indexName string, indexPartitionKeyPrefix string, targetID string, ownerID string, fromDate *time.Time, toDate *time.Time) ([]model.Transaction, error) {
 	if targetID == "" || indexName == "" || indexPartitionKeyPrefix == "" {
 		return nil, errors.New("index name, index partition key prefix, and target ID are required")
 	}
@@ -81,16 +81,40 @@ func (repository *transactionRepository) ListByGSI(ctx context.Context, indexNam
 		return nil, err
 	}
 
+	queryExpression := indexPartitionKeyField + " = :indexPK"
+	expressionValues := map[string]any{
+		":indexPK": utils.GetPartitionKey(indexPartitionKeyPrefix, targetID),
+	}
+	filterExpression := ""
+	if ownerID != "" {
+		expressionValues[":ownerPK"] = utils.GetPartitionKey("USER", ownerID)
+		filterExpression = "PK = :ownerPK"
+	}
+
+	if fromDate != nil && toDate != nil {
+		if fromDate.After(*toDate) {
+			return nil, errors.New("from date must not be after to date")
+		}
+
+		indexSortKeyField, err := getIndexSortKeyField(indexName)
+		if err != nil {
+			return nil, err
+		}
+
+		queryExpression += " AND " + indexSortKeyField + " BETWEEN :from AND :to"
+		expressionValues[":from"] = utils.GetSortingKey("TX", *fromDate, "")
+		expressionValues[":to"] = utils.GetSortingKey("TX", *toDate, "")
+	}
+
 	transactions := []model.Transaction{}
 
 	err = repository.db.QueryItems(
 		ctx,
 		repository.tableName,
-		indexPartitionKeyField+" = :pk",
-		map[string]any{
-			":pk": utils.GetPartitionKey(indexPartitionKeyPrefix, targetID),
-		},
+		queryExpression,
+		expressionValues,
 		indexName,
+		filterExpression,
 		&transactions,
 	)
 
@@ -105,9 +129,40 @@ func (repository *transactionRepository) ListByGSI(ctx context.Context, indexNam
 	return transactions, nil
 }
 
-// ListWithinDateRange lists transactions within a date range.
-func (repository *transactionRepository) ListWithinDateRange() {
+// ListWithinDateRange lists transactions for a user within a date range.
+func (repository *transactionRepository) ListWithinDateRange(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time) ([]model.Transaction, error) {
+	if ownerID == "" {
+		return nil, errors.New("owner ID is required")
+	}
+	if fromDate.IsZero() || toDate.IsZero() {
+		return nil, errors.New("from date and to date are required")
+	}
+	if fromDate.After(toDate) {
+		return nil, errors.New("from date must not be after to date")
+	}
 
+	fromSK := utils.GetSortingKey("TX", fromDate, "")
+	toSK := utils.GetSortingKey("TX", toDate, "")
+
+	transactions := []model.Transaction{}
+	err := repository.db.QueryItems(
+		ctx,
+		repository.tableName,
+		"PK = :pk AND SK BETWEEN :from AND :to",
+		map[string]any{
+			":pk":   utils.GetPartitionKey("USER", ownerID),
+			":from": fromSK,
+			":to":   toSK,
+		},
+		"",
+		"",
+		&transactions,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list transactions within date range: %w", err)
+	}
+
+	return transactions, nil
 }
 
 func (repository *transactionRepository) GetByKey(ctx context.Context, id string) (*model.Transaction, error) {
@@ -115,7 +170,7 @@ func (repository *transactionRepository) GetByKey(ctx context.Context, id string
 		return nil, errors.New("ID is required")
 	}
 
-	transactions, err := repository.ListByGSI(ctx, "GSI3_PK", "GSI_3", id)
+	transactions, err := repository.ListByGSI(ctx, "GSI3", "TX_ID", id, "", nil, nil)
 
 	if err != nil {
 		return nil, err
@@ -172,6 +227,20 @@ func getIndexPartitionKeyField(indexName string) (string, error) {
 		return "GSI2_PK", nil
 	case "GSI3":
 		return "GSI3_PK", nil
+	default:
+		return "", fmt.Errorf("unsupported index name: %s", indexName)
+	}
+}
+
+// getIndexSortKeyField resolves a GSI name to its sort key attribute.
+func getIndexSortKeyField(indexName string) (string, error) {
+	switch indexName {
+	case "GSI1":
+		return "GSI_SK", nil
+	case "GSI2":
+		return "GSI2_SK", nil
+	case "GSI3":
+		return "GSI3_SK", nil
 	default:
 		return "", fmt.Errorf("unsupported index name: %s", indexName)
 	}

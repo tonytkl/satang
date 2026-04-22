@@ -26,7 +26,7 @@ type DynamoDBClient interface {
 	PutItem(ctx context.Context, table string, item any) error
 	GetItem(ctx context.Context, table string, key map[string]any, out any) error
 	DeleteItem(ctx context.Context, table string, key map[string]any) error
-	QueryItems(ctx context.Context, table string, keyConditionExpression string, expressionValues map[string]any, indexName string, out any) error
+	QueryItems(ctx context.Context, table string, keyConditionExpression string, expressionValues map[string]any, indexName string, filterExpression string, out any) error
 	ScanItems(ctx context.Context, table string, filterExpression string, expressionValues map[string]any, out any) error
 }
 
@@ -140,7 +140,7 @@ func (d *DynamoDB) DeleteItem(ctx context.Context, table string, key map[string]
 
 // QueryItems runs a DynamoDB Query operation and unmarshals the matching items into out.
 // expressionValues should map placeholders like ":pk" to concrete values.
-func (d *DynamoDB) QueryItems(ctx context.Context, table, keyConditionExpression string, expressionValues map[string]any, indexName string, out any) error {
+func (d *DynamoDB) QueryItems(ctx context.Context, table, keyConditionExpression string, expressionValues map[string]any, indexName string, filterExpression string, out any) error {
 	attrValues, err := marshalExpressionValues(expressionValues)
 	if err != nil {
 		return fmt.Errorf("marshal expression values: %w", err)
@@ -153,6 +153,9 @@ func (d *DynamoDB) QueryItems(ctx context.Context, table, keyConditionExpression
 	}
 	if indexName != "" {
 		input.IndexName = &indexName
+	}
+	if filterExpression != "" {
+		input.FilterExpression = &filterExpression
 	}
 
 	result, err := d.client.Query(ctx, input)

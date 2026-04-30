@@ -20,8 +20,8 @@ type TransactionRepository interface {
 	ListByGSI(ctx context.Context, indexName string, indexPartitionKeyPrefix string, targetID string, ownerID string, fromDate *time.Time, toDate *time.Time) ([]model.Transaction, error)
 	ListWithinDateRange(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time) ([]model.Transaction, error)
 	GetByKey(ctx context.Context, id string) (*model.Transaction, error)
-	Update()
-	Delete()
+	Update(ctx context.Context, ownerID string, transactionDate string, transactionID string, transaction *model.Transaction) error
+	Delete(ctx context.Context, ownerID string, transactionDate string, transactionID string) error
 }
 
 type transactionRepository struct {
@@ -179,14 +179,87 @@ func (repository *transactionRepository) GetByKey(ctx context.Context, id string
 	return &transactions[0], nil
 }
 
-// Update modifies an existing transaction.
-func (repository *transactionRepository) Update() {
+// Update modifies mutable attributes of an existing transaction.
+func (repository *transactionRepository) Update(ctx context.Context, ownerID string, transactionDate string, transactionID string, transaction *model.Transaction) error {
+	if ownerID == "" {
+		return errors.New("owner ID is required")
+	}
+	if transactionDate == "" {
+		return errors.New("transaction date is required")
+	}
+	if transactionID == "" {
+		return errors.New("transaction ID is required")
+	}
+	if transaction == nil {
+		return errors.New("transaction is required")
+	}
 
+	date, err := time.Parse("2006-01-02", transactionDate)
+	if err != nil {
+		return fmt.Errorf("invalid transaction date format: %w", err)
+	}
+
+	sortingKey := utils.GetSortingKey("TX", date, transactionID)
+	updatedAt := time.Now().UTC()
+
+	key := map[string]any{
+		"PK": utils.GetPartitionKey("USER", ownerID),
+		"SK": sortingKey,
+	}
+
+	updateExpression := "SET WalletID = :walletID, WalletName = :walletName, Amount = :amount, Currency = :currency, CategoryID = :categoryID, CategoryName = :categoryName, Description = :description, ImageURL = :imageURL, GSI_PK = :gsiCategoryPK, GSI2_PK = :gsiWalletPK, UpdatedAt = :updatedAt"
+
+	expressionValues := map[string]any{
+		":walletID":      transaction.WalletID,
+		":walletName":    transaction.WalletName,
+		":amount":        transaction.Amount,
+		":currency":      transaction.Currency,
+		":categoryID":    transaction.CategoryID,
+		":categoryName":  transaction.CategoryName,
+		":description":   transaction.Description,
+		":imageURL":      transaction.ImageURL,
+		":gsiCategoryPK": utils.GetPartitionKey("TX_CATEGORY", transaction.CategoryID),
+		":gsiWalletPK":   utils.GetPartitionKey("TX_WALLET", transaction.WalletID),
+		":updatedAt":     updatedAt,
+		":transactionID": transactionID,
+	}
+
+	conditionExpression := "attribute_exists(PK) AND attribute_exists(SK) AND ID = :transactionID"
+
+	if err := repository.db.UpdateItem(ctx, repository.tableName, key, updateExpression, expressionValues, conditionExpression); err != nil {
+		return fmt.Errorf("update transaction: %w", err)
+	}
+
+	return nil
 }
 
 // Delete removes an existing transaction.
-func (repository *transactionRepository) Delete() {
+func (repository *transactionRepository) Delete(ctx context.Context, ownerID string, transactionDate string, transactionID string) error {
+	if ownerID == "" {
+		return errors.New("owner ID is required")
+	}
+	if transactionDate == "" {
+		return errors.New("transaction date is required")
+	}
+	if transactionID == "" {
+		return errors.New("transaction ID is required")
+	}
 
+	date, err := time.Parse("2006-01-02", transactionDate)
+	if err != nil {
+		return fmt.Errorf("invalid transaction date format: %w", err)
+	}
+	sortingKey := utils.GetSortingKey("TX", date, transactionID)
+
+	key := map[string]any{
+		"PK": "USER#" + ownerID,
+		"SK": sortingKey,
+	}
+
+	if err := repository.db.DeleteItem(ctx, repository.tableName, key); err != nil {
+		return fmt.Errorf("delete transaction: %w", err)
+	}
+	return nil
 }
 
 // validateTransaction ensures the required transaction fields are present.

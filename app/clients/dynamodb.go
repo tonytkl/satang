@@ -24,6 +24,7 @@ import (
 // isolated from higher-level application code.
 type DynamoDBClient interface {
 	PutItem(ctx context.Context, table string, item any) error
+	UpdateItem(ctx context.Context, table string, key map[string]any, updateExpression string, expressionValues map[string]any, conditionExpression string) error
 	GetItem(ctx context.Context, table string, key map[string]any, out any) error
 	DeleteItem(ctx context.Context, table string, key map[string]any) error
 	QueryItems(ctx context.Context, table string, keyConditionExpression string, expressionValues map[string]any, indexName string, filterExpression string, out any) error
@@ -74,20 +75,54 @@ func NewDynamoDBClientWithConfig(cfg aws.Config) *DynamoDB {
 	})}
 }
 
-// PutItem writes the provided item into the given table.
-// The item may be any Go value that attributevalue.MarshalMap can encode.
+// PutItem stores an item in the specified DynamoDB table.
 func (d *DynamoDB) PutItem(ctx context.Context, table string, item any) error {
-	attrMap, err := attributevalue.MarshalMap(item)
+	attrItem, err := attributevalue.MarshalMap(item)
 	if err != nil {
 		return fmt.Errorf("marshal item: %w", err)
 	}
 
 	_, err = d.client.PutItem(ctx, &dynamodb.PutItemInput{
 		TableName: &table,
-		Item:      attrMap,
+		Item:      attrItem,
 	})
 	if err != nil {
 		return fmt.Errorf("put item: %w", err)
+	}
+
+	return nil
+}
+
+// UpdateItem updates an existing item using a DynamoDB update expression.
+// expressionValues should map placeholders like ":amount" to concrete values.
+func (d *DynamoDB) UpdateItem(ctx context.Context, table string, key map[string]any, updateExpression string, expressionValues map[string]any, conditionExpression string) error {
+	attrKey, err := attributevalue.MarshalMap(key)
+	if err != nil {
+		return fmt.Errorf("marshal key: %w", err)
+	}
+
+	attrValues, err := marshalExpressionValues(expressionValues)
+	if err != nil {
+		return fmt.Errorf("marshal expression values: %w", err)
+	}
+
+	input := &dynamodb.UpdateItemInput{
+		TableName:        &table,
+		Key:              attrKey,
+		UpdateExpression: &updateExpression,
+	}
+
+	if len(attrValues) > 0 {
+		input.ExpressionAttributeValues = attrValues
+	}
+
+	if conditionExpression != "" {
+		input.ConditionExpression = &conditionExpression
+	}
+
+	_, err = d.client.UpdateItem(ctx, input)
+	if err != nil {
+		return fmt.Errorf("update item: %w", err)
 	}
 
 	return nil

@@ -49,7 +49,7 @@ func NewTransaction(id, walletID, walletName, categoryID, categoryName, descript
 	now := time.Now().UTC()
 	dateStr := date.UTC().Format("2006-01-02")
 	return &Transaction{
-		PK:                  "USER#" + walletID,
+		PK:                  "USER#" + ownerID,
 		SK:                  "TX#" + dateStr + "#" + id,
 		GSI_ByCategoryPK:    "TX_CATEGORY#" + string(categoryID),
 		GSI_ByCategorySK:    "TX#" + dateStr + "#" + id,

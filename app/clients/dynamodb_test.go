@@ -1,4 +1,4 @@
-package test_clients
+package clients
 
 import (
 	"context"
@@ -9,7 +9,6 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/credentials"
-	clients "github.com/tonytkl/satang/clients"
 	helper "github.com/tonytkl/satang/tests/utils"
 )
 
@@ -56,8 +55,8 @@ func TestDynamoDBGetItemNotFound(t *testing.T) {
 
 	var got testTransaction
 	err := client.GetItem(context.Background(), "transactions", map[string]any{"id": "missing"}, &got)
-	if err != clients.ErrItemNotFound {
-		t.Fatalf("GetItem returned %v, want %v", err, clients.ErrItemNotFound)
+	if err != ErrItemNotFound {
+		t.Fatalf("GetItem returned %v, want %v", err, ErrItemNotFound)
 	}
 }
 
@@ -226,7 +225,7 @@ func TestDynamoDBScanItems(t *testing.T) {
 	}
 }
 
-func newTestClient(t *testing.T, handler func(t *testing.T, writer http.ResponseWriter, request *http.Request, payload map[string]any)) *clients.DynamoDB {
+func newTestClient(t *testing.T, handler func(t *testing.T, writer http.ResponseWriter, request *http.Request, payload map[string]any)) *DynamoDB {
 	t.Helper()
 
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
@@ -246,7 +245,7 @@ func newTestClient(t *testing.T, handler func(t *testing.T, writer http.Response
 	t.Setenv("ENVIRONMENT", "local")
 	t.Setenv("AWS_DYNAMODB_ENDPOINT", server.URL)
 
-	return clients.NewDynamoDBClientWithConfig(aws.Config{
+	return NewDynamoDBClientWithConfig(aws.Config{
 		Region:      "us-east-1",
 		HTTPClient:  server.Client(),
 		Credentials: aws.NewCredentialsCache(credentials.NewStaticCredentialsProvider("test", "test", "test")),

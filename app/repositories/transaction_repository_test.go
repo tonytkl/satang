@@ -10,7 +10,6 @@ import (
 
 	"github.com/tonytkl/satang/clients"
 	"github.com/tonytkl/satang/model"
-	"github.com/tonytkl/satang/repositories"
 )
 
 type mockDynamoDB struct {
@@ -110,7 +109,7 @@ func TestTransactionRepositoryCreateSuccess(t *testing.T) {
 		},
 	}
 
-	repo := repositories.NewTransactionRepository(mock, "transactions")
+	repo := NewTransactionRepository(mock, "transactions")
 	tx := &model.Transaction{
 		OwnerID:    "user-1",
 		WalletID:   "wallet-1",
@@ -127,7 +126,7 @@ func TestTransactionRepositoryCreateSuccess(t *testing.T) {
 }
 
 func TestTransactionRepositoryCreateValidationError(t *testing.T) {
-	repo := repositories.NewTransactionRepository(&mockDynamoDB{}, "transactions")
+	repo := NewTransactionRepository(&mockDynamoDB{}, "transactions")
 
 	err := repo.Create(context.Background(), &model.Transaction{
 		OwnerID:    "user-1",
@@ -180,7 +179,7 @@ func TestTransactionRepositoryListByGSISuccess(t *testing.T) {
 		},
 	}
 
-	repo := repositories.NewTransactionRepository(mock, "transactions")
+	repo := NewTransactionRepository(mock, "transactions")
 	from := time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC)
 	to := time.Date(2026, 4, 30, 0, 0, 0, 0, time.UTC)
 
@@ -194,7 +193,7 @@ func TestTransactionRepositoryListByGSISuccess(t *testing.T) {
 }
 
 func TestTransactionRepositoryListByGSIErrors(t *testing.T) {
-	repo := repositories.NewTransactionRepository(&mockDynamoDB{}, "transactions")
+	repo := NewTransactionRepository(&mockDynamoDB{}, "transactions")
 
 	_, err := repo.ListByGSI(context.Background(), "", "TX_CATEGORY", "cat-1", "", nil, nil)
 	if err == nil || err.Error() != "index name, index partition key prefix, and target ID are required" {
@@ -223,10 +222,10 @@ func TestTransactionRepositoryListByGSINotFound(t *testing.T) {
 		},
 	}
 
-	repo := repositories.NewTransactionRepository(mock, "transactions")
+	repo := NewTransactionRepository(mock, "transactions")
 
 	_, err := repo.ListByGSI(context.Background(), "GSI3", "TX_ID", "tx-1", "", nil, nil)
-	if !errors.Is(err, repositories.ErrTransactionNotFound) {
+	if !errors.Is(err, ErrTransactionNotFound) {
 		t.Fatalf("err = %v, want ErrTransactionNotFound", err)
 	}
 }
@@ -256,7 +255,7 @@ func TestTransactionRepositoryListWithinDateRangeSuccess(t *testing.T) {
 		},
 	}
 
-	repo := repositories.NewTransactionRepository(mock, "transactions")
+	repo := NewTransactionRepository(mock, "transactions")
 	from := time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC)
 	to := time.Date(2026, 4, 30, 0, 0, 0, 0, time.UTC)
 
@@ -291,7 +290,7 @@ func TestTransactionRepositoryGetByKeySuccess(t *testing.T) {
 		},
 	}
 
-	repo := repositories.NewTransactionRepository(mock, "transactions")
+	repo := NewTransactionRepository(mock, "transactions")
 
 	got, err := repo.GetByKey(context.Background(), "tx-1")
 	if err != nil {
@@ -349,7 +348,7 @@ func TestTransactionRepositoryUpdateSuccess(t *testing.T) {
 		},
 	}
 
-	repo := repositories.NewTransactionRepository(mock, "transactions")
+	repo := NewTransactionRepository(mock, "transactions")
 	err := repo.Update(context.Background(), "user-1", "2026-04-20", "tx-1", &model.Transaction{
 		WalletID:     "wallet-2",
 		WalletName:   "Cash",
@@ -381,7 +380,7 @@ func TestTransactionRepositoryDeleteSuccess(t *testing.T) {
 		},
 	}
 
-	repo := repositories.NewTransactionRepository(mock, "transactions")
+	repo := NewTransactionRepository(mock, "transactions")
 	err := repo.Delete(context.Background(), "user-1", "2026-04-20", "tx-1")
 	if err != nil {
 		t.Fatalf("Delete returned error: %v", err)
@@ -389,7 +388,7 @@ func TestTransactionRepositoryDeleteSuccess(t *testing.T) {
 }
 
 func TestTransactionRepositoryUpdateAndDeleteErrorPaths(t *testing.T) {
-	repo := repositories.NewTransactionRepository(&mockDynamoDB{}, "transactions")
+	repo := NewTransactionRepository(&mockDynamoDB{}, "transactions")
 
 	err := repo.Update(context.Background(), "", "2026-04-20", "tx-1", &model.Transaction{})
 	if err == nil || err.Error() != "owner ID is required" {
@@ -417,7 +416,7 @@ func TestTransactionRepositoryDBErrorWrapping(t *testing.T) {
 		},
 	}
 
-	repo := repositories.NewTransactionRepository(mock, "transactions")
+	repo := NewTransactionRepository(mock, "transactions")
 
 	err := repo.Update(context.Background(), "user-1", "2026-04-20", "tx-1", &model.Transaction{
 		WalletID:   "wallet-1",
@@ -447,7 +446,7 @@ func TestTransactionRepositoryDBErrorWrapping(t *testing.T) {
 		t.Fatalf("unexpected GetByKey validation error: %v", err)
 	}
 
-	if fmt.Sprintf("%v", repositories.ErrTransactionNotFound) == "" {
+	if fmt.Sprintf("%v", ErrTransactionNotFound) == "" {
 		t.Fatalf("ErrTransactionNotFound should be defined")
 	}
 }

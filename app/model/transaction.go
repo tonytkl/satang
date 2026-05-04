@@ -1,6 +1,10 @@
 package model
 
-import "time"
+import (
+	"time"
+
+	"github.com/tonytkl/satang/utils"
+)
 
 // TransactionType represents whether a transaction is an income, expense, or transfer.
 type TransactionType string
@@ -45,9 +49,10 @@ type Transaction struct {
 	UpdatedAt           time.Time       `dynamodbav:"UpdatedAt"`
 }
 
-func NewTransaction(id, walletID, walletName, categoryID, categoryName, description, currency, imageURL string, txType TransactionType, amount float64, date time.Time, ownerID string) *Transaction {
+func NewTransaction(walletID string, walletName string, categoryID string, categoryName string, description string, currency string, imageURL string, txType TransactionType, amount float64, date time.Time, ownerID string) *Transaction {
 	now := time.Now().UTC()
 	dateStr := date.UTC().Format("2006-01-02")
+	id := utils.GetUUID()
 	return &Transaction{
 		PK:                  "USER#" + ownerID,
 		SK:                  "TX#" + dateStr + "#" + id,

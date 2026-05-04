@@ -43,7 +43,7 @@ func (repository *transactionRepository) Create(ctx context.Context, transaction
 		return err
 	}
 	sortingKey := utils.GetSortingKey("TX", transaction.Date, transaction.ID)
-	transaction.ID = utils.GetUUID()
+
 	transaction.PK = utils.GetPartitionKey("USER", transaction.OwnerID)
 	transaction.SK = sortingKey
 

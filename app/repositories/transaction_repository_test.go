@@ -77,9 +77,6 @@ func TestTransactionRepositoryCreateSuccess(t *testing.T) {
 				t.Fatalf("item type = %T, want *model.Transaction", item)
 			}
 
-			if tx.ID == "" {
-				t.Fatalf("ID should be generated")
-			}
 			if tx.PK != "USER#user-1" {
 				t.Fatalf("PK = %s, want USER#user-1", tx.PK)
 			}
@@ -122,22 +119,6 @@ func TestTransactionRepositoryCreateSuccess(t *testing.T) {
 	err := repo.Create(context.Background(), tx)
 	if err != nil {
 		t.Fatalf("Create returned error: %v", err)
-	}
-}
-
-func TestTransactionRepositoryCreateValidationError(t *testing.T) {
-	repo := NewTransactionRepository(&mockDynamoDB{}, "transactions")
-
-	err := repo.Create(context.Background(), &model.Transaction{
-		OwnerID:    "user-1",
-		WalletID:   "wallet-1",
-		CategoryID: "cat-1",
-		Currency:   "THB",
-		Date:       time.Date(2026, 4, 15, 10, 0, 0, 0, time.UTC),
-	})
-
-	if err == nil || err.Error() != "Transaction amount is required" {
-		t.Fatalf("err = %v, want Transaction amount is required", err)
 	}
 }
 

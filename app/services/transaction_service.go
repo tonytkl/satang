@@ -42,6 +42,9 @@ func (service *transactionService) CreateTransaction(ctx context.Context, wallet
 		date,
 		ownerID,
 	)
+	if err := validateTransaction(transaction); err != nil {
+		return err
+	}
 	if err := service.repository.Create(ctx, transaction); err != nil {
 		return err
 	}
@@ -59,4 +62,33 @@ func getTransactionType(txType string) (model.TransactionType, error) {
 		return model.TransactionTypeTransfer, nil
 	}
 	return "", errors.New("Valid transactiontion type is required")
+}
+
+// validateTransaction ensures the required transaction fields are present.
+func validateTransaction(transaction *model.Transaction) error {
+	if transaction == nil {
+		return errors.New("Transaction is required")
+	}
+
+	if transaction.Amount == 0 {
+		return errors.New("Transaction amount is required")
+	}
+
+	if transaction.Currency == "" {
+		return errors.New("Transaction currency is required")
+	}
+
+	if transaction.WalletID == "" {
+		return errors.New("Wallet is required")
+	}
+
+	if transaction.CategoryID == "" {
+		return errors.New("Category is required")
+	}
+
+	if transaction.Date.IsZero() {
+		return errors.New("Transaction date is required")
+	}
+
+	return nil
 }

@@ -39,9 +39,6 @@ func NewTransactionRepository(db clients.DynamoDBClient, tableName string) Trans
 
 // Create stores a transaction and populates its derived keys and timestamps.
 func (repository *transactionRepository) Create(ctx context.Context, transaction *model.Transaction) error {
-	if err := validateTransaction(transaction); err != nil {
-		return err
-	}
 	sortingKey := utils.GetSortingKey("TX", transaction.Date, transaction.ID)
 
 	transaction.PK = utils.GetPartitionKey("USER", transaction.OwnerID)
@@ -259,35 +256,6 @@ func (repository *transactionRepository) Delete(ctx context.Context, ownerID str
 	if err := repository.db.DeleteItem(ctx, repository.tableName, key); err != nil {
 		return fmt.Errorf("delete transaction: %w", err)
 	}
-	return nil
-}
-
-// validateTransaction ensures the required transaction fields are present.
-func validateTransaction(transaction *model.Transaction) error {
-	if transaction == nil {
-		return errors.New("Transaction is required")
-	}
-
-	if transaction.Amount == 0 {
-		return errors.New("Transaction amount is required")
-	}
-
-	if transaction.Currency == "" {
-		return errors.New("Transaction currency is required")
-	}
-
-	if transaction.WalletID == "" {
-		return errors.New("Wallet is required")
-	}
-
-	if transaction.CategoryID == "" {
-		return errors.New("Category is required")
-	}
-
-	if transaction.Date.IsZero() {
-		return errors.New("Transaction date is required")
-	}
-
 	return nil
 }
 

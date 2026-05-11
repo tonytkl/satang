@@ -3,3 +3,5 @@
 .terraform/
 .env
 *.tfvars
+*.db
+aws/*

@@ -73,6 +73,10 @@ func (handler *createTransactionLambda) Handle(ctx context.Context, request even
 		return utils.JsonResponse(http.StatusBadRequest, errorResponse{Message: "Date must be RFC3339 or YYYY-MM-DD"})
 	}
 
+	// TODO: Use actual OwnerID from token
+	var OwnerID = "1"
+	payload.OwnerID = OwnerID
+
 	err = handler.service.CreateTransaction(
 		ctx,
 		payload.WalletID,
@@ -120,9 +124,6 @@ func validatePayload(payload createTransactionRequest) error {
 	}
 	if strings.TrimSpace(payload.Date) == "" {
 		return errors.New("date is required")
-	}
-	if strings.TrimSpace(payload.OwnerID) == "" {
-		return errors.New("ownerId is required")
 	}
 	return nil
 }

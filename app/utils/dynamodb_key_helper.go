@@ -11,7 +11,7 @@ func GetPartitionKey(pkPrefix string, id string) string {
 }
 
 func GetSortingKey(skPrefix string, date time.Time, id string) string {
-	return skPrefix + "#" + date.UTC().Format("2006-01-02")
+	return skPrefix + "#" + date.UTC().Format("2006-01-02") + "#" + id
 }
 
 func GetUUID() string {

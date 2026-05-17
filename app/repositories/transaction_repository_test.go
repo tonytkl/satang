@@ -80,23 +80,26 @@ func TestTransactionRepositoryCreateSuccess(t *testing.T) {
 			if tx.PK != "USER#user-1" {
 				t.Fatalf("PK = %s, want USER#user-1", tx.PK)
 			}
-			if tx.SK != "TX#2026-04-15" {
-				t.Fatalf("SK = %s, want TX#2026-04-15", tx.SK)
+			if tx.SK != "TX#2026-04-15#tx-1" {
+				t.Fatalf("SK = %s, want TX#2026-04-15#tx-1", tx.SK)
 			}
 			if tx.GSI_ByCategoryPK != "TX_CATEGORY#cat-1" {
 				t.Fatalf("GSI_ByCategoryPK = %s, want TX_CATEGORY#cat-1", tx.GSI_ByCategoryPK)
 			}
-			if tx.GSI_ByCategorySK != "TX#2026-04-15" {
-				t.Fatalf("GSI_ByCategorySK = %s, want TX#2026-04-15", tx.GSI_ByCategorySK)
+			if tx.GSI_ByCategorySK != "TX#2026-04-15#tx-1" {
+				t.Fatalf("GSI_ByCategorySK = %s, want TX#2026-04-15#tx-1", tx.GSI_ByCategorySK)
 			}
 			if tx.GSI_ByWalletPK != "TX_WALLET#wallet-1" {
 				t.Fatalf("GSI_ByWalletPK = %s, want TX_WALLET#wallet-1", tx.GSI_ByWalletPK)
 			}
-			if tx.GSI_ByWalletSK != "TX#2026-04-15" {
-				t.Fatalf("GSI_ByWalletSK = %s, want TX#2026-04-15", tx.GSI_ByWalletSK)
+			if tx.GSI_ByWalletSK != "TX#2026-04-15#tx-1" {
+				t.Fatalf("GSI_ByWalletSK = %s, want TX#2026-04-15#tx-1", tx.GSI_ByWalletSK)
 			}
-			if !strings.HasPrefix(tx.GSI_ByTransactionID, "TX_ID#") {
-				t.Fatalf("GSI_ByTransactionID = %s, should start with TX_ID#", tx.GSI_ByTransactionID)
+			if tx.GSI_ByTransactionID != "TX_ID#tx-1" {
+				t.Fatalf("GSI_ByTransactionID = %s, want TX_ID#tx-1", tx.GSI_ByTransactionID)
+			}
+			if tx.GSI_ByTransactionSK != "TX#2026-04-15#tx-1" {
+				t.Fatalf("GSI_ByTransactionSK = %s, want TX#2026-04-15#tx-1", tx.GSI_ByTransactionSK)
 			}
 			if tx.CreatedAt.IsZero() || tx.UpdatedAt.IsZero() {
 				t.Fatalf("created/updated timestamps should be set")
@@ -108,6 +111,7 @@ func TestTransactionRepositoryCreateSuccess(t *testing.T) {
 
 	repo := NewTransactionRepository(mock, "transactions")
 	tx := &model.Transaction{
+		ID:         "tx-1",
 		OwnerID:    "user-1",
 		WalletID:   "wallet-1",
 		CategoryID: "cat-1",
@@ -143,11 +147,11 @@ func TestTransactionRepositoryListByGSISuccess(t *testing.T) {
 			if expressionValues[":ownerPK"] != "USER#user-1" {
 				t.Fatalf(":ownerPK = %v, want USER#user-1", expressionValues[":ownerPK"])
 			}
-			if expressionValues[":from"] != "TX#2026-04-01" {
-				t.Fatalf(":from = %v, want TX#2026-04-01", expressionValues[":from"])
+			if expressionValues[":from"] != "TX#2026-04-01#" {
+				t.Fatalf(":from = %v, want TX#2026-04-01#", expressionValues[":from"])
 			}
-			if expressionValues[":to"] != "TX#2026-04-30" {
-				t.Fatalf(":to = %v, want TX#2026-04-30", expressionValues[":to"])
+			if expressionValues[":to"] != "TX#2026-04-30#" {
+				t.Fatalf(":to = %v, want TX#2026-04-30#", expressionValues[":to"])
 			}
 
 			dst, ok := out.(*[]model.Transaction)
@@ -205,9 +209,12 @@ func TestTransactionRepositoryListByGSINotFound(t *testing.T) {
 
 	repo := NewTransactionRepository(mock, "transactions")
 
-	_, err := repo.ListByGSI(context.Background(), "GSI3", "TX_ID", "tx-1", "", nil, nil)
-	if !errors.Is(err, ErrTransactionNotFound) {
-		t.Fatalf("err = %v, want ErrTransactionNotFound", err)
+	got, err := repo.ListByGSI(context.Background(), "GSI3", "TX_ID", "tx-1", "", nil, nil)
+	if err != nil {
+		t.Fatalf("err = %v, want nil", err)
+	}
+	if len(got) != 0 {
+		t.Fatalf("len(got) = %d, want 0", len(got))
 	}
 }
 
@@ -223,11 +230,11 @@ func TestTransactionRepositoryListWithinDateRangeSuccess(t *testing.T) {
 			if expressionValues[":pk"] != "USER#user-1" {
 				t.Fatalf(":pk = %v, want USER#user-1", expressionValues[":pk"])
 			}
-			if expressionValues[":from"] != "TX#2026-04-01" {
-				t.Fatalf(":from = %v, want TX#2026-04-01", expressionValues[":from"])
+			if expressionValues[":from"] != "TX#2026-04-01#" {
+				t.Fatalf(":from = %v, want TX#2026-04-01#", expressionValues[":from"])
 			}
-			if expressionValues[":to"] != "TX#2026-04-30" {
-				t.Fatalf(":to = %v, want TX#2026-04-30", expressionValues[":to"])
+			if expressionValues[":to"] != "TX#2026-04-30#" {
+				t.Fatalf(":to = %v, want TX#2026-04-30#", expressionValues[":to"])
 			}
 
 			dst := out.(*[]model.Transaction)
@@ -294,8 +301,8 @@ func TestTransactionRepositoryUpdateSuccess(t *testing.T) {
 			if key["PK"] != "USER#user-1" {
 				t.Fatalf("key PK = %v, want USER#user-1", key["PK"])
 			}
-			if key["SK"] != "TX#2026-04-20" {
-				t.Fatalf("key SK = %v, want TX#2026-04-20", key["SK"])
+			if key["SK"] != "TX#2026-04-20#tx-1" {
+				t.Fatalf("key SK = %v, want TX#2026-04-20#tx-1", key["SK"])
 			}
 
 			wantCond := "attribute_exists(PK) AND attribute_exists(SK) AND ID = :transactionID"
@@ -354,8 +361,8 @@ func TestTransactionRepositoryDeleteSuccess(t *testing.T) {
 			if key["PK"] != "USER#user-1" {
 				t.Fatalf("key PK = %v, want USER#user-1", key["PK"])
 			}
-			if key["SK"] != "TX#2026-04-20" {
-				t.Fatalf("key SK = %v, want TX#2026-04-20", key["SK"])
+			if key["SK"] != "TX#2026-04-20#tx-1" {
+				t.Fatalf("key SK = %v, want TX#2026-04-20#tx-1", key["SK"])
 			}
 			return nil
 		},

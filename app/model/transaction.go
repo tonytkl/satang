@@ -33,6 +33,7 @@ type Transaction struct {
 	GSI_ByWalletPK      string          `dynamodbav:"GSI2_PK,omitempty"`
 	GSI_ByWalletSK      string          `dynamodbav:"GSI2_SK,omitempty"`
 	GSI_ByTransactionID string          `dynamodbav:"GSI3_PK,omitempty"`
+	GSI_ByTransactionSK string          `dynamodbav:"GSI3_SK,omitempty"`
 	ID                  string          `dynamodbav:"ID"`
 	WalletID            string          `dynamodbav:"WalletID"`
 	WalletName          string          `dynamodbav:"WalletName,omitempty"`
@@ -61,6 +62,7 @@ func NewTransaction(walletID string, walletName string, categoryID string, categ
 		GSI_ByWalletPK:      "TX_WALLET#" + string(walletID),
 		GSI_ByWalletSK:      "TX#" + dateStr + "#" + id,
 		GSI_ByTransactionID: "TX_ID#" + id,
+		GSI_ByTransactionSK: "TX#" + dateStr + "#" + id,
 		ID:                  id,
 		WalletID:            walletID,
 		WalletName:          walletName,

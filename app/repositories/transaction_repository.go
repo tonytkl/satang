@@ -51,6 +51,7 @@ func (repository *transactionRepository) Create(ctx context.Context, transaction
 	transaction.GSI_ByWalletSK = sortingKey
 
 	transaction.GSI_ByTransactionID = "TX_ID#" + transaction.ID
+	transaction.GSI_ByTransactionSK = sortingKey
 
 	if transaction.CreatedAt.IsZero() {
 		transaction.CreatedAt = time.Now().UTC()
@@ -119,10 +120,6 @@ func (repository *transactionRepository) ListByGSI(ctx context.Context, indexNam
 		return nil, fmt.Errorf("query transaction by ID: %w", err)
 	}
 
-	if len(transactions) == 0 {
-		return nil, ErrTransactionNotFound
-	}
-
 	return transactions, nil
 }
 
@@ -171,6 +168,10 @@ func (repository *transactionRepository) GetByKey(ctx context.Context, id string
 
 	if err != nil {
 		return nil, err
+	}
+
+	if len(transactions) == 0 {
+		return nil, ErrTransactionNotFound
 	}
 
 	return &transactions[0], nil

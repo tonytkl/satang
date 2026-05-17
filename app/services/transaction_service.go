@@ -12,6 +12,7 @@ import (
 
 type TransactionService interface {
 	CreateTransaction(ctx context.Context, walletID string, walletName string, categoryID string, categoryName string, description string, currency string, imageURL string, txType string, amount float64, date time.Time, ownerID string) error
+	GetTransaction(ctx context.Context, transactionID string) (*model.Transaction, error)
 }
 
 type transactionService struct {
@@ -49,6 +50,14 @@ func (service *transactionService) CreateTransaction(ctx context.Context, wallet
 		return err
 	}
 	return nil
+}
+
+func (service *transactionService) GetTransaction(ctx context.Context, transactionID string) (*model.Transaction, error) {
+	if transactionID == "" {
+		return nil, errors.New("Transaction ID is required")
+	}
+
+	return service.repository.GetByKey(ctx, transactionID)
 }
 
 func getTransactionType(txType string) (model.TransactionType, error) {

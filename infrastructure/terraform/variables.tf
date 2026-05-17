@@ -10,12 +10,6 @@ variable "table_name" {
   default     = "satang-dynamodb"
 }
 
-variable "create_transaction_lambda_zip_path" {
-  description = "Path to the create-transaction Lambda zip artifact"
-  type        = string
-  default     = "../../aws/lambda/create_transaction.zip"
-}
-
 variable "environment" {
   description = "Deployment environment. Use 'local' to target local service endpoints"
   type        = string

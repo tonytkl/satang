@@ -1,0 +1,11 @@
+mode: set
+github.com/tonytkl/satang/lambda/transactions/get_transaction/main.go:26.13,29.16 3 0
+github.com/tonytkl/satang/lambda/transactions/get_transaction/main.go:29.16,30.55 1 0
+github.com/tonytkl/satang/lambda/transactions/get_transaction/main.go:33.2,34.40 2 0
+github.com/tonytkl/satang/lambda/transactions/get_transaction/main.go:34.40,35.34 1 0
+github.com/tonytkl/satang/lambda/transactions/get_transaction/main.go:38.2,42.30 4 0
+github.com/tonytkl/satang/lambda/transactions/get_transaction/main.go:45.147,49.48 3 1
+github.com/tonytkl/satang/lambda/transactions/get_transaction/main.go:49.48,51.3 1 1
+github.com/tonytkl/satang/lambda/transactions/get_transaction/main.go:53.2,53.16 1 1
+github.com/tonytkl/satang/lambda/transactions/get_transaction/main.go:53.16,55.3 1 1
+github.com/tonytkl/satang/lambda/transactions/get_transaction/main.go:57.2,57.55 1 1

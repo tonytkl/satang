@@ -4,10 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/tonytkl/satang/clients"
 	"github.com/tonytkl/satang/model"
 )
@@ -68,42 +69,21 @@ func (m *mockDynamoDB) ScanItems(ctx context.Context, table string, filterExpres
 func TestTransactionRepositoryCreateSuccess(t *testing.T) {
 	mock := &mockDynamoDB{
 		putItemFn: func(_ context.Context, table string, item any) error {
-			if table != "transactions" {
-				t.Fatalf("table = %s, want transactions", table)
-			}
+			require.Equal(t, "transactions", table)
 
 			tx, ok := item.(*model.Transaction)
-			if !ok {
-				t.Fatalf("item type = %T, want *model.Transaction", item)
-			}
+			require.True(t, ok, "item type = %T, want *model.Transaction", item)
 
-			if tx.PK != "USER#user-1" {
-				t.Fatalf("PK = %s, want USER#user-1", tx.PK)
-			}
-			if tx.SK != "TX#2026-04-15#tx-1" {
-				t.Fatalf("SK = %s, want TX#2026-04-15#tx-1", tx.SK)
-			}
-			if tx.GSI_ByCategoryPK != "TX_CATEGORY#cat-1" {
-				t.Fatalf("GSI_ByCategoryPK = %s, want TX_CATEGORY#cat-1", tx.GSI_ByCategoryPK)
-			}
-			if tx.GSI_ByCategorySK != "TX#2026-04-15#tx-1" {
-				t.Fatalf("GSI_ByCategorySK = %s, want TX#2026-04-15#tx-1", tx.GSI_ByCategorySK)
-			}
-			if tx.GSI_ByWalletPK != "TX_WALLET#wallet-1" {
-				t.Fatalf("GSI_ByWalletPK = %s, want TX_WALLET#wallet-1", tx.GSI_ByWalletPK)
-			}
-			if tx.GSI_ByWalletSK != "TX#2026-04-15#tx-1" {
-				t.Fatalf("GSI_ByWalletSK = %s, want TX#2026-04-15#tx-1", tx.GSI_ByWalletSK)
-			}
-			if tx.GSI_ByTransactionID != "TX_ID#tx-1" {
-				t.Fatalf("GSI_ByTransactionID = %s, want TX_ID#tx-1", tx.GSI_ByTransactionID)
-			}
-			if tx.GSI_ByTransactionSK != "TX#2026-04-15#tx-1" {
-				t.Fatalf("GSI_ByTransactionSK = %s, want TX#2026-04-15#tx-1", tx.GSI_ByTransactionSK)
-			}
-			if tx.CreatedAt.IsZero() || tx.UpdatedAt.IsZero() {
-				t.Fatalf("created/updated timestamps should be set")
-			}
+			assert.Equal(t, "USER#user-1", tx.PK)
+			assert.Equal(t, "TX#2026-04-15#tx-1", tx.SK)
+			assert.Equal(t, "TX_CATEGORY#cat-1", tx.GSI_ByCategoryPK)
+			assert.Equal(t, "TX#2026-04-15#tx-1", tx.GSI_ByCategorySK)
+			assert.Equal(t, "TX_WALLET#wallet-1", tx.GSI_ByWalletPK)
+			assert.Equal(t, "TX#2026-04-15#tx-1", tx.GSI_ByWalletSK)
+			assert.Equal(t, "TX_ID#tx-1", tx.GSI_ByTransactionID)
+			assert.Equal(t, "TX#2026-04-15#tx-1", tx.GSI_ByTransactionSK)
+			assert.False(t, tx.CreatedAt.IsZero())
+			assert.False(t, tx.UpdatedAt.IsZero())
 
 			return nil
 		},
@@ -121,43 +101,23 @@ func TestTransactionRepositoryCreateSuccess(t *testing.T) {
 	}
 
 	err := repo.Create(context.Background(), tx)
-	if err != nil {
-		t.Fatalf("Create returned error: %v", err)
-	}
+	require.NoError(t, err)
 }
 
 func TestTransactionRepositoryListByGSISuccess(t *testing.T) {
 	mock := &mockDynamoDB{
 		queryItemsFn: func(_ context.Context, table string, keyConditionExpression string, expressionValues map[string]any, indexName string, filterExpression string, out any) error {
-			if table != "transactions" {
-				t.Fatalf("table = %s, want transactions", table)
-			}
-			if indexName != "GSI1" {
-				t.Fatalf("indexName = %s, want GSI1", indexName)
-			}
-			if keyConditionExpression != "GSI_PK = :indexPK AND GSI_SK BETWEEN :from AND :to" {
-				t.Fatalf("keyConditionExpression = %s", keyConditionExpression)
-			}
-			if filterExpression != "PK = :ownerPK" {
-				t.Fatalf("filterExpression = %s, want PK = :ownerPK", filterExpression)
-			}
-			if expressionValues[":indexPK"] != "TX_CATEGORY#cat-1" {
-				t.Fatalf(":indexPK = %v, want TX_CATEGORY#cat-1", expressionValues[":indexPK"])
-			}
-			if expressionValues[":ownerPK"] != "USER#user-1" {
-				t.Fatalf(":ownerPK = %v, want USER#user-1", expressionValues[":ownerPK"])
-			}
-			if expressionValues[":from"] != "TX#2026-04-01#" {
-				t.Fatalf(":from = %v, want TX#2026-04-01#", expressionValues[":from"])
-			}
-			if expressionValues[":to"] != "TX#2026-04-30#" {
-				t.Fatalf(":to = %v, want TX#2026-04-30#", expressionValues[":to"])
-			}
+			require.Equal(t, "transactions", table)
+			require.Equal(t, "GSI1", indexName)
+			require.Equal(t, "GSI_PK = :indexPK AND GSI_SK BETWEEN :from AND :to", keyConditionExpression)
+			require.Equal(t, "PK = :ownerPK", filterExpression)
+			assert.Equal(t, "TX_CATEGORY#cat-1", expressionValues[":indexPK"])
+			assert.Equal(t, "USER#user-1", expressionValues[":ownerPK"])
+			assert.Equal(t, "TX#2026-04-01#", expressionValues[":from"])
+			assert.Equal(t, "TX#2026-04-30#", expressionValues[":to"])
 
 			dst, ok := out.(*[]model.Transaction)
-			if !ok {
-				t.Fatalf("out type = %T, want *[]model.Transaction", out)
-			}
+			require.True(t, ok, "out type = %T, want *[]model.Transaction", out)
 			*dst = []model.Transaction{{ID: "tx-1"}}
 
 			return nil
@@ -169,33 +129,25 @@ func TestTransactionRepositoryListByGSISuccess(t *testing.T) {
 	to := time.Date(2026, 4, 30, 0, 0, 0, 0, time.UTC)
 
 	got, err := repo.ListByGSI(context.Background(), "GSI1", "TX_CATEGORY", "cat-1", "user-1", &from, &to)
-	if err != nil {
-		t.Fatalf("ListByGSI returned error: %v", err)
-	}
-	if len(got) != 1 || got[0].ID != "tx-1" {
-		t.Fatalf("ListByGSI returned unexpected result: %#v", got)
-	}
+	require.NoError(t, err)
+	require.Len(t, got, 1)
+	assert.Equal(t, "tx-1", got[0].ID)
 }
 
 func TestTransactionRepositoryListByGSIErrors(t *testing.T) {
 	repo := NewTransactionRepository(&mockDynamoDB{}, "transactions")
 
 	_, err := repo.ListByGSI(context.Background(), "", "TX_CATEGORY", "cat-1", "", nil, nil)
-	if err == nil || err.Error() != "index name, index partition key prefix, and target ID are required" {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.EqualError(t, err, "index name, index partition key prefix, and target ID are required")
 
 	_, err = repo.ListByGSI(context.Background(), "BAD_INDEX", "TX_CATEGORY", "cat-1", "", nil, nil)
-	if err == nil || !strings.Contains(err.Error(), "unsupported index name") {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "unsupported index name")
 
 	from := time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC)
 	to := time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC)
 	_, err = repo.ListByGSI(context.Background(), "GSI1", "TX_CATEGORY", "cat-1", "", &from, &to)
-	if err == nil || err.Error() != "from date must not be after to date" {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.EqualError(t, err, "from date must not be after to date")
 }
 
 func TestTransactionRepositoryListByGSINotFound(t *testing.T) {
@@ -210,32 +162,19 @@ func TestTransactionRepositoryListByGSINotFound(t *testing.T) {
 	repo := NewTransactionRepository(mock, "transactions")
 
 	got, err := repo.ListByGSI(context.Background(), "GSI3", "TX_ID", "tx-1", "", nil, nil)
-	if err != nil {
-		t.Fatalf("err = %v, want nil", err)
-	}
-	if len(got) != 0 {
-		t.Fatalf("len(got) = %d, want 0", len(got))
-	}
+	require.NoError(t, err)
+	assert.Len(t, got, 0)
 }
 
 func TestTransactionRepositoryListWithinDateRangeSuccess(t *testing.T) {
 	mock := &mockDynamoDB{
 		queryItemsFn: func(_ context.Context, _ string, keyConditionExpression string, expressionValues map[string]any, indexName string, filterExpression string, out any) error {
-			if keyConditionExpression != "PK = :pk AND SK BETWEEN :from AND :to" {
-				t.Fatalf("keyConditionExpression = %s", keyConditionExpression)
-			}
-			if indexName != "" || filterExpression != "" {
-				t.Fatalf("indexName/filterExpression should be empty")
-			}
-			if expressionValues[":pk"] != "USER#user-1" {
-				t.Fatalf(":pk = %v, want USER#user-1", expressionValues[":pk"])
-			}
-			if expressionValues[":from"] != "TX#2026-04-01#" {
-				t.Fatalf(":from = %v, want TX#2026-04-01#", expressionValues[":from"])
-			}
-			if expressionValues[":to"] != "TX#2026-04-30#" {
-				t.Fatalf(":to = %v, want TX#2026-04-30#", expressionValues[":to"])
-			}
+			require.Equal(t, "PK = :pk AND SK BETWEEN :from AND :to", keyConditionExpression)
+			require.Empty(t, indexName)
+			require.Empty(t, filterExpression)
+			assert.Equal(t, "USER#user-1", expressionValues[":pk"])
+			assert.Equal(t, "TX#2026-04-01#", expressionValues[":from"])
+			assert.Equal(t, "TX#2026-04-30#", expressionValues[":to"])
 
 			dst := out.(*[]model.Transaction)
 			*dst = []model.Transaction{{ID: "tx-1"}, {ID: "tx-2"}}
@@ -248,29 +187,17 @@ func TestTransactionRepositoryListWithinDateRangeSuccess(t *testing.T) {
 	to := time.Date(2026, 4, 30, 0, 0, 0, 0, time.UTC)
 
 	got, err := repo.ListWithinDateRange(context.Background(), "user-1", from, to)
-	if err != nil {
-		t.Fatalf("ListWithinDateRange returned error: %v", err)
-	}
-	if len(got) != 2 {
-		t.Fatalf("len(got) = %d, want 2", len(got))
-	}
+	require.NoError(t, err)
+	assert.Len(t, got, 2)
 }
 
 func TestTransactionRepositoryGetByKeySuccess(t *testing.T) {
 	mock := &mockDynamoDB{
 		queryItemsFn: func(_ context.Context, _ string, keyConditionExpression string, expressionValues map[string]any, indexName string, filterExpression string, out any) error {
-			if indexName != "GSI3" {
-				t.Fatalf("indexName = %s, want GSI3", indexName)
-			}
-			if keyConditionExpression != "GSI3_PK = :indexPK" {
-				t.Fatalf("keyConditionExpression = %s, want GSI3_PK = :indexPK", keyConditionExpression)
-			}
-			if filterExpression != "" {
-				t.Fatalf("filterExpression = %s, want empty", filterExpression)
-			}
-			if expressionValues[":indexPK"] != "TX_ID#tx-1" {
-				t.Fatalf(":indexPK = %v, want TX_ID#tx-1", expressionValues[":indexPK"])
-			}
+			require.Equal(t, "GSI3", indexName)
+			require.Equal(t, "GSI3_PK = :indexPK", keyConditionExpression)
+			require.Empty(t, filterExpression)
+			assert.Equal(t, "TX_ID#tx-1", expressionValues[":indexPK"])
 
 			dst := out.(*[]model.Transaction)
 			*dst = []model.Transaction{{ID: "tx-1"}}
@@ -281,12 +208,9 @@ func TestTransactionRepositoryGetByKeySuccess(t *testing.T) {
 	repo := NewTransactionRepository(mock, "transactions")
 
 	got, err := repo.GetByKey(context.Background(), "tx-1")
-	if err != nil {
-		t.Fatalf("GetByKey returned error: %v", err)
-	}
-	if got == nil || got.ID != "tx-1" {
-		t.Fatalf("GetByKey returned unexpected result: %#v", got)
-	}
+	require.NoError(t, err)
+	require.NotNil(t, got)
+	assert.Equal(t, "tx-1", got.ID)
 }
 
 func TestTransactionRepositoryUpdateSuccess(t *testing.T) {
@@ -295,42 +219,23 @@ func TestTransactionRepositoryUpdateSuccess(t *testing.T) {
 
 	mock := &mockDynamoDB{
 		updateItemFn: func(_ context.Context, table string, key map[string]any, updateExpression string, expressionValues map[string]any, conditionExpression string) error {
-			if table != "transactions" {
-				t.Fatalf("table = %s, want transactions", table)
-			}
-			if key["PK"] != "USER#user-1" {
-				t.Fatalf("key PK = %v, want USER#user-1", key["PK"])
-			}
-			if key["SK"] != "TX#2026-04-20#tx-1" {
-				t.Fatalf("key SK = %v, want TX#2026-04-20#tx-1", key["SK"])
-			}
+			require.Equal(t, "transactions", table)
+			assert.Equal(t, "USER#user-1", key["PK"])
+			assert.Equal(t, "TX#2026-04-20#tx-1", key["SK"])
 
 			wantCond := "attribute_exists(PK) AND attribute_exists(SK) AND ID = :transactionID"
-			if conditionExpression != wantCond {
-				t.Fatalf("conditionExpression = %s", conditionExpression)
-			}
+			require.Equal(t, wantCond, conditionExpression)
 
-			if !strings.Contains(updateExpression, "SET WalletID = :walletID") {
-				t.Fatalf("unexpected updateExpression: %s", updateExpression)
-			}
+			assert.Contains(t, updateExpression, "SET WalletID = :walletID")
 
-			if expressionValues[":walletID"] != "wallet-2" {
-				t.Fatalf(":walletID = %v, want wallet-2", expressionValues[":walletID"])
-			}
-			if expressionValues[":gsiCategoryPK"] != "TX_CATEGORY#cat-2" {
-				t.Fatalf(":gsiCategoryPK = %v, want TX_CATEGORY#cat-2", expressionValues[":gsiCategoryPK"])
-			}
-			if expressionValues[":gsiWalletPK"] != "TX_WALLET#wallet-2" {
-				t.Fatalf(":gsiWalletPK = %v, want TX_WALLET#wallet-2", expressionValues[":gsiWalletPK"])
-			}
-			if expressionValues[":transactionID"] != "tx-1" {
-				t.Fatalf(":transactionID = %v, want tx-1", expressionValues[":transactionID"])
-			}
+			assert.Equal(t, "wallet-2", expressionValues[":walletID"])
+			assert.Equal(t, "TX_CATEGORY#cat-2", expressionValues[":gsiCategoryPK"])
+			assert.Equal(t, "TX_WALLET#wallet-2", expressionValues[":gsiWalletPK"])
+			assert.Equal(t, "tx-1", expressionValues[":transactionID"])
 
 			updatedAt, ok := expressionValues[":updatedAt"].(time.Time)
-			if !ok || updatedAt.IsZero() {
-				t.Fatalf(":updatedAt should be a non-zero time.Time")
-			}
+			require.True(t, ok)
+			assert.False(t, updatedAt.IsZero())
 
 			return nil
 		},
@@ -347,46 +252,33 @@ func TestTransactionRepositoryUpdateSuccess(t *testing.T) {
 		Description:  &desc,
 		ImageURL:     &image,
 	})
-	if err != nil {
-		t.Fatalf("Update returned error: %v", err)
-	}
+	require.NoError(t, err)
 }
 
 func TestTransactionRepositoryDeleteSuccess(t *testing.T) {
 	mock := &mockDynamoDB{
 		deleteItemFn: func(_ context.Context, table string, key map[string]any) error {
-			if table != "transactions" {
-				t.Fatalf("table = %s, want transactions", table)
-			}
-			if key["PK"] != "USER#user-1" {
-				t.Fatalf("key PK = %v, want USER#user-1", key["PK"])
-			}
-			if key["SK"] != "TX#2026-04-20#tx-1" {
-				t.Fatalf("key SK = %v, want TX#2026-04-20#tx-1", key["SK"])
-			}
+			require.Equal(t, "transactions", table)
+			assert.Equal(t, "USER#user-1", key["PK"])
+			assert.Equal(t, "TX#2026-04-20#tx-1", key["SK"])
 			return nil
 		},
 	}
 
 	repo := NewTransactionRepository(mock, "transactions")
 	err := repo.Delete(context.Background(), "user-1", "2026-04-20", "tx-1")
-	if err != nil {
-		t.Fatalf("Delete returned error: %v", err)
-	}
+	require.NoError(t, err)
 }
 
 func TestTransactionRepositoryUpdateAndDeleteErrorPaths(t *testing.T) {
 	repo := NewTransactionRepository(&mockDynamoDB{}, "transactions")
 
 	err := repo.Update(context.Background(), "", "2026-04-20", "tx-1", &model.Transaction{})
-	if err == nil || err.Error() != "owner ID is required" {
-		t.Fatalf("unexpected Update error: %v", err)
-	}
+	require.EqualError(t, err, "owner ID is required")
 
 	err = repo.Delete(context.Background(), "user-1", "bad-date", "tx-1")
-	if err == nil || !strings.Contains(err.Error(), "invalid transaction date format") {
-		t.Fatalf("unexpected Delete error: %v", err)
-	}
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid transaction date format")
 }
 
 func TestTransactionRepositoryDBErrorWrapping(t *testing.T) {
@@ -410,31 +302,25 @@ func TestTransactionRepositoryDBErrorWrapping(t *testing.T) {
 		WalletID:   "wallet-1",
 		CategoryID: "cat-1",
 	})
-	if err == nil || !strings.Contains(err.Error(), "update transaction") || !errors.Is(err, dbErr) {
-		t.Fatalf("unexpected Update error: %v", err)
-	}
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "update transaction")
+	assert.ErrorIs(t, err, dbErr)
 
 	_, err = repo.ListByGSI(context.Background(), "GSI3", "TX_ID", "tx-1", "", nil, nil)
-	if err == nil || !strings.Contains(err.Error(), "query transaction by ID") || !errors.Is(err, dbErr) {
-		t.Fatalf("unexpected ListByGSI error: %v", err)
-	}
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "query transaction by ID")
+	assert.ErrorIs(t, err, dbErr)
 
 	err = repo.Delete(context.Background(), "user-1", "2026-04-20", "tx-1")
-	if err == nil || !strings.Contains(err.Error(), "delete transaction") || !errors.Is(err, dbErr) {
-		t.Fatalf("unexpected Delete error: %v", err)
-	}
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "delete transaction")
+	assert.ErrorIs(t, err, dbErr)
 
 	_, err = repo.ListWithinDateRange(context.Background(), "", time.Now(), time.Now())
-	if err == nil || err.Error() != "owner ID is required" {
-		t.Fatalf("unexpected ListWithinDateRange validation error: %v", err)
-	}
+	require.EqualError(t, err, "owner ID is required")
 
 	_, err = repo.GetByKey(context.Background(), "")
-	if err == nil || err.Error() != "ID is required" {
-		t.Fatalf("unexpected GetByKey validation error: %v", err)
-	}
+	require.EqualError(t, err, "ID is required")
 
-	if fmt.Sprintf("%v", ErrTransactionNotFound) == "" {
-		t.Fatalf("ErrTransactionNotFound should be defined")
-	}
+	assert.NotEmpty(t, fmt.Sprintf("%v", ErrTransactionNotFound))
 }

@@ -9,7 +9,8 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/credentials"
-	helper "github.com/tonytkl/satang/utils"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type testTransaction struct {
@@ -20,11 +21,11 @@ type testTransaction struct {
 
 func TestDynamoDBGetItem(t *testing.T) {
 	client := newTestClient(t, func(t *testing.T, writer http.ResponseWriter, request *http.Request, payload map[string]any) {
-		helper.AssertHeader(t, request, "X-Amz-Target", "DynamoDB_20120810.GetItem")
-		helper.AssertEqual(t, payload["TableName"], "transactions")
+		assert.Equal(t, "DynamoDB_20120810.GetItem", request.Header.Get("X-Amz-Target"))
+		assert.Equal(t, "transactions", payload["TableName"])
 
 		key := payload["Key"].(map[string]any)
-		helper.AssertEqual(t, key["id"].(map[string]any)["S"], "txn-1")
+		assert.Equal(t, "txn-1", key["id"].(map[string]any)["S"])
 
 		writeJSON(t, writer, map[string]any{
 			"Item": map[string]any{
@@ -37,58 +38,49 @@ func TestDynamoDBGetItem(t *testing.T) {
 
 	var got testTransaction
 	err := client.GetItem(context.Background(), "transactions", map[string]any{"id": "txn-1"}, &got)
-	if err != nil {
-		t.Fatalf("GetItem returned error: %v", err)
-	}
-
-	if got != (testTransaction{ID: "txn-1", UserID: "user-1", Amount: 42}) {
-		t.Fatalf("GetItem returned unexpected item: %#v", got)
-	}
+	require.NoError(t, err)
+	assert.Equal(t, testTransaction{ID: "txn-1", UserID: "user-1", Amount: 42}, got)
 }
 
 func TestDynamoDBGetItemNotFound(t *testing.T) {
 	client := newTestClient(t, func(t *testing.T, writer http.ResponseWriter, request *http.Request, payload map[string]any) {
-		helper.AssertHeader(t, request, "X-Amz-Target", "DynamoDB_20120810.GetItem")
-		helper.AssertEqual(t, payload["TableName"], "transactions")
+		assert.Equal(t, "DynamoDB_20120810.GetItem", request.Header.Get("X-Amz-Target"))
+		assert.Equal(t, "transactions", payload["TableName"])
 		writeJSON(t, writer, map[string]any{})
 	})
 
 	var got testTransaction
 	err := client.GetItem(context.Background(), "transactions", map[string]any{"id": "missing"}, &got)
-	if err != ErrItemNotFound {
-		t.Fatalf("GetItem returned %v, want %v", err, ErrItemNotFound)
-	}
+	require.ErrorIs(t, err, ErrItemNotFound)
 }
 
 func TestDynamoDBDeleteItem(t *testing.T) {
 	client := newTestClient(t, func(t *testing.T, writer http.ResponseWriter, request *http.Request, payload map[string]any) {
-		helper.AssertHeader(t, request, "X-Amz-Target", "DynamoDB_20120810.DeleteItem")
-		helper.AssertEqual(t, payload["TableName"], "transactions")
+		assert.Equal(t, "DynamoDB_20120810.DeleteItem", request.Header.Get("X-Amz-Target"))
+		assert.Equal(t, "transactions", payload["TableName"])
 
 		key := payload["Key"].(map[string]any)
-		helper.AssertEqual(t, key["id"].(map[string]any)["S"], "txn-1")
+		assert.Equal(t, "txn-1", key["id"].(map[string]any)["S"])
 
 		writeJSON(t, writer, map[string]any{})
 	})
 
 	err := client.DeleteItem(context.Background(), "transactions", map[string]any{"id": "txn-1"})
-	if err != nil {
-		t.Fatalf("DeleteItem returned error: %v", err)
-	}
+	require.NoError(t, err)
 }
 
 func TestDynamoDBUpdateItem(t *testing.T) {
 	client := newTestClient(t, func(t *testing.T, writer http.ResponseWriter, request *http.Request, payload map[string]any) {
-		helper.AssertHeader(t, request, "X-Amz-Target", "DynamoDB_20120810.UpdateItem")
-		helper.AssertEqual(t, payload["TableName"], "transactions")
-		helper.AssertEqual(t, payload["UpdateExpression"], "SET amount = :amount")
-		helper.AssertEqual(t, payload["ConditionExpression"], "attribute_exists(id)")
+		assert.Equal(t, "DynamoDB_20120810.UpdateItem", request.Header.Get("X-Amz-Target"))
+		assert.Equal(t, "transactions", payload["TableName"])
+		assert.Equal(t, "SET amount = :amount", payload["UpdateExpression"])
+		assert.Equal(t, "attribute_exists(id)", payload["ConditionExpression"])
 
 		key := payload["Key"].(map[string]any)
-		helper.AssertEqual(t, key["id"].(map[string]any)["S"], "txn-1")
+		assert.Equal(t, "txn-1", key["id"].(map[string]any)["S"])
 
 		values := payload["ExpressionAttributeValues"].(map[string]any)
-		helper.AssertEqual(t, values[":amount"].(map[string]any)["N"], "99")
+		assert.Equal(t, "99", values[":amount"].(map[string]any)["N"])
 
 		writeJSON(t, writer, map[string]any{})
 	})
@@ -101,26 +93,20 @@ func TestDynamoDBUpdateItem(t *testing.T) {
 		map[string]any{":amount": 99},
 		"attribute_exists(id)",
 	)
-	if err != nil {
-		t.Fatalf("UpdateItem returned error: %v", err)
-	}
+	require.NoError(t, err)
 }
 
 func TestDynamoDBUpdateItemWithoutOptionalFields(t *testing.T) {
 	client := newTestClient(t, func(t *testing.T, writer http.ResponseWriter, request *http.Request, payload map[string]any) {
-		helper.AssertHeader(t, request, "X-Amz-Target", "DynamoDB_20120810.UpdateItem")
-		helper.AssertEqual(t, payload["TableName"], "transactions")
-		helper.AssertEqual(t, payload["UpdateExpression"], "SET amount = amount + :increment")
+		assert.Equal(t, "DynamoDB_20120810.UpdateItem", request.Header.Get("X-Amz-Target"))
+		assert.Equal(t, "transactions", payload["TableName"])
+		assert.Equal(t, "SET amount = amount + :increment", payload["UpdateExpression"])
 
 		key := payload["Key"].(map[string]any)
-		helper.AssertEqual(t, key["id"].(map[string]any)["S"], "txn-2")
+		assert.Equal(t, "txn-2", key["id"].(map[string]any)["S"])
 
-		if _, ok := payload["ExpressionAttributeValues"]; ok {
-			t.Fatalf("ExpressionAttributeValues should be omitted when empty")
-		}
-		if _, ok := payload["ConditionExpression"]; ok {
-			t.Fatalf("ConditionExpression should be omitted when empty")
-		}
+		assert.NotContains(t, payload, "ExpressionAttributeValues")
+		assert.NotContains(t, payload, "ConditionExpression")
 
 		writeJSON(t, writer, map[string]any{})
 	})
@@ -133,20 +119,18 @@ func TestDynamoDBUpdateItemWithoutOptionalFields(t *testing.T) {
 		map[string]any{},
 		"",
 	)
-	if err != nil {
-		t.Fatalf("UpdateItem returned error: %v", err)
-	}
+	require.NoError(t, err)
 }
 
 func TestDynamoDBQueryItems(t *testing.T) {
 	client := newTestClient(t, func(t *testing.T, writer http.ResponseWriter, request *http.Request, payload map[string]any) {
-		helper.AssertHeader(t, request, "X-Amz-Target", "DynamoDB_20120810.Query")
-		helper.AssertEqual(t, payload["TableName"], "transactions")
-		helper.AssertEqual(t, payload["KeyConditionExpression"], "user_id = :user_id")
-		helper.AssertEqual(t, payload["IndexName"], "user-index")
+		assert.Equal(t, "DynamoDB_20120810.Query", request.Header.Get("X-Amz-Target"))
+		assert.Equal(t, "transactions", payload["TableName"])
+		assert.Equal(t, "user_id = :user_id", payload["KeyConditionExpression"])
+		assert.Equal(t, "user-index", payload["IndexName"])
 
 		values := payload["ExpressionAttributeValues"].(map[string]any)
-		helper.AssertEqual(t, values[":user_id"].(map[string]any)["S"], "user-1")
+		assert.Equal(t, "user-1", values[":user_id"].(map[string]any)["S"])
 
 		writeJSON(t, writer, map[string]any{
 			"Items": []map[string]any{
@@ -174,27 +158,23 @@ func TestDynamoDBQueryItems(t *testing.T) {
 		"",
 		&got,
 	)
-	if err != nil {
-		t.Fatalf("QueryItems returned error: %v", err)
-	}
+	require.NoError(t, err)
 
 	want := []testTransaction{
 		{ID: "txn-1", UserID: "user-1", Amount: 42},
 		{ID: "txn-2", UserID: "user-1", Amount: 100},
 	}
-	if !equalTransactions(got, want) {
-		t.Fatalf("QueryItems returned unexpected items: %#v", got)
-	}
+	assert.Equal(t, want, got)
 }
 
 func TestDynamoDBScanItems(t *testing.T) {
 	client := newTestClient(t, func(t *testing.T, writer http.ResponseWriter, request *http.Request, payload map[string]any) {
-		helper.AssertHeader(t, request, "X-Amz-Target", "DynamoDB_20120810.Scan")
-		helper.AssertEqual(t, payload["TableName"], "transactions")
-		helper.AssertEqual(t, payload["FilterExpression"], "user_id = :user_id")
+		assert.Equal(t, "DynamoDB_20120810.Scan", request.Header.Get("X-Amz-Target"))
+		assert.Equal(t, "transactions", payload["TableName"])
+		assert.Equal(t, "user_id = :user_id", payload["FilterExpression"])
 
 		values := payload["ExpressionAttributeValues"].(map[string]any)
-		helper.AssertEqual(t, values[":user_id"].(map[string]any)["S"], "user-1")
+		assert.Equal(t, "user-1", values[":user_id"].(map[string]any)["S"])
 
 		writeJSON(t, writer, map[string]any{
 			"Items": []map[string]any{
@@ -215,14 +195,10 @@ func TestDynamoDBScanItems(t *testing.T) {
 		map[string]any{":user_id": "user-1"},
 		&got,
 	)
-	if err != nil {
-		t.Fatalf("ScanItems returned error: %v", err)
-	}
+	require.NoError(t, err)
 
 	want := []testTransaction{{ID: "txn-1", UserID: "user-1", Amount: 42}}
-	if !equalTransactions(got, want) {
-		t.Fatalf("ScanItems returned unexpected items: %#v", got)
-	}
+	assert.Equal(t, want, got)
 }
 
 func newTestClient(t *testing.T, handler func(t *testing.T, writer http.ResponseWriter, request *http.Request, payload map[string]any)) *DynamoDB {
@@ -234,9 +210,8 @@ func newTestClient(t *testing.T, handler func(t *testing.T, writer http.Response
 		defer request.Body.Close()
 
 		payload := map[string]any{}
-		if err := json.NewDecoder(request.Body).Decode(&payload); err != nil {
-			t.Fatalf("decode request body: %v", err)
-		}
+		err := json.NewDecoder(request.Body).Decode(&payload)
+		require.NoError(t, err)
 
 		handler(t, writer, request, payload)
 	}))
@@ -255,9 +230,8 @@ func newTestClient(t *testing.T, handler func(t *testing.T, writer http.Response
 func writeJSON(t *testing.T, writer http.ResponseWriter, body map[string]any) {
 	t.Helper()
 
-	if err := json.NewEncoder(writer).Encode(body); err != nil {
-		t.Fatalf("encode response body: %v", err)
-	}
+	err := json.NewEncoder(writer).Encode(body)
+	require.NoError(t, err)
 }
 
 func equalTransactions(got, want []testTransaction) bool {

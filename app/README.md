@@ -1,10 +1,11 @@
 # Satang App
 
-The `app` directory contains the Go module for Satang's data layer. It provides:
-- Domain models for users, wallets, categories, and transactions.
+The `app` directory contains the Go module for Satang's application logic and data layer. It provides:
+- Domain models for core entities (users, wallets, categories, transactions).
 - A DynamoDB client wrapper built on AWS SDK v2.
-- Repository implementations for transaction data access.
-- Unit tests for client behavior.
+- Repository layer for data access patterns.
+- Service layer for business logic.
+- AWS Lambda handler implementations.
 
 ## Module
 
@@ -15,22 +16,20 @@ The `app` directory contains the Go module for Satang's data layer. It provides:
 
 ```text
 app/
-├── clients/                # AWS client wrappers (DynamoDB)
-├── model/                  # Domain models and key conventions
-├── repositories/           # Data access layer
-├── tests/
-│   ├── test_clients/       # DynamoDB client tests
-│   └── test_utils/         # Test helpers/assertions
-├── utils/                  # Key/UUID helpers
-├── docker/
-│   └── dynamodb/           # Local DynamoDB persistence volume
-├── docker-compose.yml      # Local DynamoDB service
+├── clients/                # AWS SDK client wrappers (DynamoDB)
+├── model/                  # Domain models and entity definitions
+├── repositories/           # Data access layer and query patterns
+├── services/               # Business logic layer
+├── lambda/                 # AWS Lambda handler implementations
+├── utils/                  # Helper utilities (key generation, date handling, etc.)
 └── go.mod
 ```
 
 ## Local Development
 
 ### 1. Start DynamoDB Local
+
+From the repository root, run:
 
 ```bash
 docker compose up -d
@@ -57,35 +56,48 @@ go test ./...
 
 ## Data Modeling
 
-The project uses a single-table style key design with prefixed partition/sort keys and GSIs.
+The project uses a single-table design pattern with DynamoDB, utilizing prefixed partition/sort keys and Global Secondary Indexes (GSIs) for flexible querying.
 
-Primary keys and GSIs used by transactions:
-- `PK`
-- `SK`
-- `GSI_PK` / `GSI_SK` (define different access)
+**Key Design:**
+- `PK` (Partition Key) — Primary access pattern
+- `SK` (Sort Key) — Primary sort/range pattern
+- `GSI_PK` / `GSI_SK` — Secondary access patterns via Global Secondary Indexes
 
-Examples:
-- User partition: `USER#<owner-id>`
-- Transaction sort key: `TX#<yyyy-mm-dd>#<transaction-id>`
-- Category index key: `TX_CATEGORY#<category-id>`
-- Wallet index key: `TX_WALLET#<wallet-id>`
-- Transaction-id index key: `TX_ID#<transaction-id>`
+**Naming Conventions:**
+Keys are prefixed with entity type for clarity. For example:
+- Entity partition keys use format: `<ENTITY_TYPE>#<id>`
+- Entity sort keys use format: `<ENTITY_TYPE>#<date-or-identifier>`
+- Index keys enable queries by specific attributes (e.g., by category, wallet, or entity ID)
+
+Refer to individual model definitions in `model/` and repository implementations in `repositories/` for specific key schemes.
 
 ## Core Components
 
-- `clients/dynamodb.go`
-	- Defines `DynamoDBClient` interface (`PutItem`, `GetItem`, `DeleteItem`, `QueryItems`, `ScanItems`).
-	- Provides `NewDynamoDBClient` and `NewDynamoDBClientWithConfig`.
-	- Supports `.env` loading and local endpoint override.
+### Clients (`clients/`)
+- **`dynamodb.go`** — DynamoDB client wrapper
+  - `DynamoDBClient` interface with standard operations: `PutItem`, `GetItem`, `DeleteItem`, `QueryItems`, `ScanItems`
+  - `NewDynamoDBClient` and `NewDynamoDBClientWithConfig` constructors
+  - Supports `.env` configuration and local endpoint override
 
-- `repositories/transaction_repository.go`
-	- Main repository used for transaction create/get/list flows.
-	- Supports querying by GSI and date ranges.
+### Data Layer (`repositories/`, `model/`)
+- **`repositories/`** — Data access implementations
+  - Entity repository patterns for query/write operations
+  - Supports GSI queries, date range filtering, and batch operations
+- **`model/`** — Domain entity definitions
+  - Core entity structs (User, Wallet, Category, etc.)
+  - Entity-specific key generation and validation
 
-- `model/*.go`
-	- Contains entity structs and key conventions.
+### Business Layer (`services/`)
+- **`services/`** — Business logic and orchestration
+  - Service implementations for domain operations
+  - Composition of repositories and utilities
 
-## Notes
+### AWS Integration (`lambda/`)
+- **`lambda/`** — AWS Lambda handler entry points
+  - HTTP endpoint handlers with API Gateway integration
+  - Request/response marshaling and error handling
 
-- The repository currently includes `_transactionRepository` and `transactionRepository` variants; the non-underscore `TransactionRepository` is the primary exported API.
-- `utils.GetSortingKey` currently formats keys as `TX#<date>` (without ID suffix), while some model constructors include ID in transaction SKs. Keep this in mind when evolving key strategies.
+### Utilities (`utils/`)
+- **`api_gateway_helper.go`** — API Gateway request/response utilities
+- **`date_helper.go`** — Date and time utilities
+- **`dynamodb_key_helper.go`** — Key generation and formatting helpers

@@ -19,7 +19,7 @@ type TransactionRepository interface {
 	Create(ctx context.Context, transaction *model.Transaction) error
 	ListByGSI(ctx context.Context, indexName string, indexPartitionKeyPrefix string, targetID string, ownerID string, fromDate *time.Time, toDate *time.Time) ([]model.Transaction, error)
 	ListWithinDateRange(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time) ([]model.Transaction, error)
-	GetByKey(ctx context.Context, id string) (*model.Transaction, error)
+	GetByKey(ctx context.Context, id string, ownerID string) (*model.Transaction, error)
 	Update(ctx context.Context, ownerID string, transactionDate string, transactionID string, transaction *model.Transaction) error
 	Delete(ctx context.Context, ownerID string, transactionDate string, transactionID string) error
 }
@@ -159,12 +159,8 @@ func (repository *transactionRepository) ListWithinDateRange(ctx context.Context
 	return transactions, nil
 }
 
-func (repository *transactionRepository) GetByKey(ctx context.Context, id string) (*model.Transaction, error) {
-	if id == "" {
-		return nil, errors.New("ID is required")
-	}
-
-	transactions, err := repository.ListByGSI(ctx, "GSI3", "TX_ID", id, "", nil, nil)
+func (repository *transactionRepository) GetByKey(ctx context.Context, id string, ownerID string) (*model.Transaction, error) {
+	transactions, err := repository.ListByGSI(ctx, "GSI3", "TX_ID", id, ownerID, nil, nil)
 
 	if err != nil {
 		return nil, err

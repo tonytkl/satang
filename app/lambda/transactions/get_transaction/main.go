@@ -44,7 +44,11 @@ func main() {
 
 func (handler *getTransactionLambda) Handle(ctx context.Context, request events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error) {
 	transactionID := request.PathParameters["transaction_id"]
-	transaction, err := handler.service.GetTransaction(ctx, transactionID)
+
+	// TODO: Get user from authentication context
+	ownerID := "1"
+
+	transaction, err := handler.service.GetTransaction(ctx, transactionID, ownerID)
 
 	if err == repositories.ErrTransactionNotFound {
 		return utils.JsonResponse(http.StatusNotFound, errorResponse{Message: err.Error()})

@@ -27,7 +27,7 @@ func (m *MockTransactionService) CreateTransaction(ctx context.Context, walletID
 	return nil
 }
 
-func (m *MockTransactionService) GetTransaction(ctx context.Context, transactionID string) (*model.Transaction, error) {
+func (m *MockTransactionService) GetTransaction(ctx context.Context, transactionID string, ownerID string) (*model.Transaction, error) {
 	if m.GetTransactionFunc != nil {
 		return m.GetTransactionFunc(ctx, transactionID)
 	}

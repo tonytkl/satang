@@ -15,7 +15,7 @@ import (
 // mockTransactionRepository implements repositories.TransactionRepository for testing
 type mockTransactionRepository struct {
 	createFn   func(ctx context.Context, transaction *model.Transaction) error
-	getByKeyFn func(ctx context.Context, id string) (*model.Transaction, error)
+	getByKeyFn func(ctx context.Context, id string, ownerID string) (*model.Transaction, error)
 }
 
 var _ repositories.TransactionRepository = (*mockTransactionRepository)(nil)
@@ -27,9 +27,9 @@ func (m *mockTransactionRepository) Create(ctx context.Context, transaction *mod
 	return nil
 }
 
-func (m *mockTransactionRepository) GetByKey(ctx context.Context, id string) (*model.Transaction, error) {
+func (m *mockTransactionRepository) GetByKey(ctx context.Context, id string, ownerID string) (*model.Transaction, error) {
 	if m.getByKeyFn != nil {
-		return m.getByKeyFn(ctx, id)
+		return m.getByKeyFn(ctx, id, ownerID)
 	}
 	return nil, nil
 }
@@ -252,6 +252,7 @@ func TestCreateTransactionRepositoryError(t *testing.T) {
 
 func TestGetTransactionSuccess(t *testing.T) {
 	expectedTx := &model.Transaction{
+		PK:         "USER#1",
 		ID:         "tx-1",
 		WalletID:   "wallet-1",
 		CategoryID: "category-1",
@@ -262,7 +263,7 @@ func TestGetTransactionSuccess(t *testing.T) {
 	}
 
 	mock := &mockTransactionRepository{
-		getByKeyFn: func(ctx context.Context, id string) (*model.Transaction, error) {
+		getByKeyFn: func(ctx context.Context, id string, ownerID string) (*model.Transaction, error) {
 			assert.Equal(t, "tx-1", id)
 			return expectedTx, nil
 		},
@@ -271,7 +272,7 @@ func TestGetTransactionSuccess(t *testing.T) {
 	service := NewTransactionService(mock)
 	ctx := context.Background()
 
-	tx, err := service.GetTransaction(ctx, "tx-1")
+	tx, err := service.GetTransaction(ctx, "tx-1", "1")
 	require.NoError(t, err)
 	assert.Equal(t, expectedTx, tx)
 }
@@ -281,7 +282,7 @@ func TestGetTransactionEmptyID(t *testing.T) {
 	service := NewTransactionService(mock)
 	ctx := context.Background()
 
-	tx, err := service.GetTransaction(ctx, "")
+	tx, err := service.GetTransaction(ctx, "", "")
 	require.Error(t, err)
 	assert.Nil(t, tx)
 }
@@ -289,7 +290,7 @@ func TestGetTransactionEmptyID(t *testing.T) {
 func TestGetTransactionRepositoryError(t *testing.T) {
 	expectedErr := errors.New("database error")
 	mock := &mockTransactionRepository{
-		getByKeyFn: func(ctx context.Context, id string) (*model.Transaction, error) {
+		getByKeyFn: func(ctx context.Context, id string, ownerID string) (*model.Transaction, error) {
 			return nil, expectedErr
 		},
 	}
@@ -297,7 +298,7 @@ func TestGetTransactionRepositoryError(t *testing.T) {
 	service := NewTransactionService(mock)
 	ctx := context.Background()
 
-	tx, err := service.GetTransaction(ctx, "tx-1")
+	tx, err := service.GetTransaction(ctx, "tx-1", "1")
 	require.ErrorIs(t, err, expectedErr)
 	assert.Nil(t, tx)
 }

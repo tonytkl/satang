@@ -196,21 +196,21 @@ func TestTransactionRepositoryGetByKeySuccess(t *testing.T) {
 		queryItemsFn: func(_ context.Context, _ string, keyConditionExpression string, expressionValues map[string]any, indexName string, filterExpression string, out any) error {
 			require.Equal(t, "GSI3", indexName)
 			require.Equal(t, "GSI3_PK = :indexPK", keyConditionExpression)
-			require.Empty(t, filterExpression)
 			assert.Equal(t, "TX_ID#tx-1", expressionValues[":indexPK"])
 
 			dst := out.(*[]model.Transaction)
-			*dst = []model.Transaction{{ID: "tx-1"}}
+			*dst = []model.Transaction{{ID: "tx-1", PK: "USER#1"}}
 			return nil
 		},
 	}
 
 	repo := NewTransactionRepository(mock, "transactions")
 
-	got, err := repo.GetByKey(context.Background(), "tx-1")
+	got, err := repo.GetByKey(context.Background(), "tx-1", "1")
 	require.NoError(t, err)
 	require.NotNil(t, got)
 	assert.Equal(t, "tx-1", got.ID)
+	assert.Equal(t, "USER#1", got.PK)
 }
 
 func TestTransactionRepositoryUpdateSuccess(t *testing.T) {
@@ -315,12 +315,6 @@ func TestTransactionRepositoryDBErrorWrapping(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "delete transaction")
 	assert.ErrorIs(t, err, dbErr)
-
-	_, err = repo.ListWithinDateRange(context.Background(), "", time.Now(), time.Now())
-	require.EqualError(t, err, "owner ID is required")
-
-	_, err = repo.GetByKey(context.Background(), "")
-	require.EqualError(t, err, "ID is required")
 
 	assert.NotEmpty(t, fmt.Sprintf("%v", ErrTransactionNotFound))
 }

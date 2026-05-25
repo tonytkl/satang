@@ -14,8 +14,9 @@ import (
 
 // mockTransactionRepository implements repositories.TransactionRepository for testing
 type mockTransactionRepository struct {
-	createFn   func(ctx context.Context, transaction *model.Transaction) error
-	getByKeyFn func(ctx context.Context, id string, ownerID string) (*model.Transaction, error)
+	createFn              func(ctx context.Context, transaction *model.Transaction) error
+	getByKeyFn            func(ctx context.Context, id string, ownerID string) (*model.Transaction, error)
+	listWithinDateRangeFn func(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, nextToken string) ([]model.Transaction, string, error)
 }
 
 var _ repositories.TransactionRepository = (*mockTransactionRepository)(nil)
@@ -38,8 +39,11 @@ func (m *mockTransactionRepository) ListByGSI(ctx context.Context, indexName str
 	return nil, nil
 }
 
-func (m *mockTransactionRepository) ListWithinDateRange(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time) ([]model.Transaction, error) {
-	return nil, nil
+func (m *mockTransactionRepository) ListWithinDateRange(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, nextToken string) ([]model.Transaction, string, error) {
+	if m.listWithinDateRangeFn != nil {
+		return m.listWithinDateRangeFn(ctx, ownerID, fromDate, toDate, limit, nextToken)
+	}
+	return nil, "", nil
 }
 
 func (m *mockTransactionRepository) Update(ctx context.Context, ownerID string, transactionDate string, transactionID string, transaction *model.Transaction) error {
@@ -347,4 +351,43 @@ func TestCreateTransactionAllTypes(t *testing.T) {
 			require.NoError(t, err)
 		})
 	}
+}
+
+func TestGetTransactionsBetweenPeriodSuccess(t *testing.T) {
+	from := time.Date(2026, time.April, 1, 0, 0, 0, 0, time.UTC)
+	to := time.Date(2026, time.April, 30, 0, 0, 0, 0, time.UTC)
+
+	mock := &mockTransactionRepository{
+		listWithinDateRangeFn: func(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, nextToken string) ([]model.Transaction, string, error) {
+			assert.Equal(t, "user-1", ownerID)
+			assert.Equal(t, from, fromDate)
+			assert.Equal(t, to, toDate)
+			assert.Equal(t, int32(25), limit)
+			assert.Equal(t, "token-1", nextToken)
+
+			return []model.Transaction{{ID: "tx-1"}}, "token-2", nil
+		},
+	}
+
+	service := NewTransactionService(mock)
+	txs, token, err := service.GetTransactionsBetweenPeriod(context.Background(), "user-1", from, to, 25, "token-1")
+	require.NoError(t, err)
+	assert.Len(t, txs, 1)
+	assert.Equal(t, "tx-1", txs[0].ID)
+	assert.Equal(t, "token-2", token)
+}
+
+func TestGetTransactionsBetweenPeriodValidation(t *testing.T) {
+	service := NewTransactionService(&mockTransactionRepository{})
+	from := time.Date(2026, time.April, 1, 0, 0, 0, 0, time.UTC)
+	to := time.Date(2026, time.April, 30, 0, 0, 0, 0, time.UTC)
+
+	_, _, err := service.GetTransactionsBetweenPeriod(context.Background(), "", from, to, 10, "")
+	require.EqualError(t, err, "owner ID is required")
+
+	_, _, err = service.GetTransactionsBetweenPeriod(context.Background(), "user-1", time.Time{}, to, 10, "")
+	require.EqualError(t, err, "from date and to date are required")
+
+	_, _, err = service.GetTransactionsBetweenPeriod(context.Background(), "user-1", from, to, -1, "")
+	require.EqualError(t, err, "limit must be greater than or equal to 0")
 }

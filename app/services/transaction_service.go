@@ -8,11 +8,13 @@ import (
 
 	"github.com/tonytkl/satang/model"
 	"github.com/tonytkl/satang/repositories"
+	"github.com/tonytkl/satang/utils"
 )
 
 type TransactionService interface {
 	CreateTransaction(ctx context.Context, walletID string, walletName string, categoryID string, categoryName string, description string, currency string, imageURL string, txType string, amount float64, date time.Time, ownerID string) error
 	GetTransaction(ctx context.Context, transactionID string, ownerID string) (*model.Transaction, error)
+	GetTransactionsBetweenPeriod(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, nextToken string) ([]model.Transaction, string, error)
 }
 
 type transactionService struct {
@@ -62,6 +64,25 @@ func (service *transactionService) GetTransaction(ctx context.Context, transacti
 	}
 
 	return service.repository.GetByKey(ctx, transactionID, ownerID)
+}
+
+func (service *transactionService) GetTransactionsBetweenPeriod(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, nextToken string) ([]model.Transaction, string, error) {
+	if ownerID == "" {
+		return nil, "", errors.New("owner ID is required")
+	}
+	if fromDate.IsZero() || toDate.IsZero() {
+		return nil, "", errors.New("from date and to date are required")
+	}
+	if limit < 0 {
+		return nil, "", errors.New("limit must be greater than or equal to 0")
+	}
+
+	// Default pagination size if not set
+	if limit == 0 {
+		limit = utils.DEFAULT_PAGINATION_SIZE
+	}
+
+	return service.repository.ListWithinDateRange(ctx, ownerID, fromDate, toDate, limit, nextToken)
 }
 
 func getTransactionType(txType string) (model.TransactionType, error) {

@@ -14,12 +14,13 @@ import (
 )
 
 type mockDynamoDB struct {
-	putItemFn    func(ctx context.Context, table string, item any) error
-	updateItemFn func(ctx context.Context, table string, key map[string]any, updateExpression string, expressionValues map[string]any, conditionExpression string) error
-	getItemFn    func(ctx context.Context, table string, key map[string]any, out any) error
-	deleteItemFn func(ctx context.Context, table string, key map[string]any) error
-	queryItemsFn func(ctx context.Context, table string, keyConditionExpression string, expressionValues map[string]any, indexName string, filterExpression string, out any) error
-	scanItemsFn  func(ctx context.Context, table string, filterExpression string, expressionValues map[string]any, out any) error
+	putItemFn                  func(ctx context.Context, table string, item any) error
+	updateItemFn               func(ctx context.Context, table string, key map[string]any, updateExpression string, expressionValues map[string]any, conditionExpression string) error
+	getItemFn                  func(ctx context.Context, table string, key map[string]any, out any) error
+	deleteItemFn               func(ctx context.Context, table string, key map[string]any) error
+	queryItemsFn               func(ctx context.Context, table string, keyConditionExpression string, expressionValues map[string]any, indexName string, filterExpression string, out any) error
+	queryItemsWithPaginationFn func(ctx context.Context, table string, keyConditionExpression string, expressionValues map[string]any, indexName string, filterExpression string, limit int32, nextToken string, out any) (string, error)
+	scanItemsFn                func(ctx context.Context, table string, filterExpression string, expressionValues map[string]any, out any) error
 }
 
 var _ clients.DynamoDBClient = (*mockDynamoDB)(nil)
@@ -57,6 +58,20 @@ func (m *mockDynamoDB) QueryItems(ctx context.Context, table string, keyConditio
 		return m.queryItemsFn(ctx, table, keyConditionExpression, expressionValues, indexName, filterExpression, out)
 	}
 	return nil
+}
+
+func (m *mockDynamoDB) QueryItemsWithPagination(ctx context.Context, table string, keyConditionExpression string, expressionValues map[string]any, indexName string, filterExpression string, limit int32, nextToken string, out any) (string, error) {
+	if m.queryItemsWithPaginationFn != nil {
+		return m.queryItemsWithPaginationFn(ctx, table, keyConditionExpression, expressionValues, indexName, filterExpression, limit, nextToken, out)
+	}
+
+	if m.queryItemsFn != nil {
+		if err := m.queryItemsFn(ctx, table, keyConditionExpression, expressionValues, indexName, filterExpression, out); err != nil {
+			return "", err
+		}
+	}
+
+	return "", nil
 }
 
 func (m *mockDynamoDB) ScanItems(ctx context.Context, table string, filterExpression string, expressionValues map[string]any, out any) error {
@@ -168,17 +183,19 @@ func TestTransactionRepositoryListByGSINotFound(t *testing.T) {
 
 func TestTransactionRepositoryListWithinDateRangeSuccess(t *testing.T) {
 	mock := &mockDynamoDB{
-		queryItemsFn: func(_ context.Context, _ string, keyConditionExpression string, expressionValues map[string]any, indexName string, filterExpression string, out any) error {
+		queryItemsWithPaginationFn: func(_ context.Context, _ string, keyConditionExpression string, expressionValues map[string]any, indexName string, filterExpression string, limit int32, nextToken string, out any) (string, error) {
 			require.Equal(t, "PK = :pk AND SK BETWEEN :from AND :to", keyConditionExpression)
 			require.Empty(t, indexName)
 			require.Empty(t, filterExpression)
+			require.Equal(t, int32(20), limit)
+			require.Equal(t, "token-1", nextToken)
 			assert.Equal(t, "USER#user-1", expressionValues[":pk"])
 			assert.Equal(t, "TX#2026-04-01#", expressionValues[":from"])
 			assert.Equal(t, "TX#2026-04-30#", expressionValues[":to"])
 
 			dst := out.(*[]model.Transaction)
 			*dst = []model.Transaction{{ID: "tx-1"}, {ID: "tx-2"}}
-			return nil
+			return "token-2", nil
 		},
 	}
 
@@ -186,9 +203,10 @@ func TestTransactionRepositoryListWithinDateRangeSuccess(t *testing.T) {
 	from := time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC)
 	to := time.Date(2026, 4, 30, 0, 0, 0, 0, time.UTC)
 
-	got, err := repo.ListWithinDateRange(context.Background(), "user-1", from, to)
+	got, nextToken, err := repo.ListWithinDateRange(context.Background(), "user-1", from, to, 20, "token-1")
 	require.NoError(t, err)
 	assert.Len(t, got, 2)
+	assert.Equal(t, "token-2", nextToken)
 }
 
 func TestTransactionRepositoryGetByKeySuccess(t *testing.T) {

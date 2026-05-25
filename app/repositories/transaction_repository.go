@@ -18,7 +18,7 @@ var ErrTransactionNotFound = errors.New("transaction not found")
 type TransactionRepository interface {
 	Create(ctx context.Context, transaction *model.Transaction) error
 	ListByGSI(ctx context.Context, indexName string, indexPartitionKeyPrefix string, targetID string, ownerID string, fromDate *time.Time, toDate *time.Time) ([]model.Transaction, error)
-	ListWithinDateRange(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time) ([]model.Transaction, error)
+	ListWithinDateRange(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, nextToken string) ([]model.Transaction, string, error)
 	GetByKey(ctx context.Context, id string, ownerID string) (*model.Transaction, error)
 	Update(ctx context.Context, ownerID string, transactionDate string, transactionID string, transaction *model.Transaction) error
 	Delete(ctx context.Context, ownerID string, transactionDate string, transactionID string) error
@@ -124,22 +124,16 @@ func (repository *transactionRepository) ListByGSI(ctx context.Context, indexNam
 }
 
 // ListWithinDateRange lists transactions for a user within a date range.
-func (repository *transactionRepository) ListWithinDateRange(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time) ([]model.Transaction, error) {
-	if ownerID == "" {
-		return nil, errors.New("owner ID is required")
-	}
-	if fromDate.IsZero() || toDate.IsZero() {
-		return nil, errors.New("from date and to date are required")
-	}
+func (repository *transactionRepository) ListWithinDateRange(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, nextToken string) ([]model.Transaction, string, error) {
 	if fromDate.After(toDate) {
-		return nil, errors.New("from date must not be after to date")
+		return nil, "", errors.New("from date must not be after to date")
 	}
 
 	fromSK := utils.GetSortingKey("TX", fromDate, "")
 	toSK := utils.GetSortingKey("TX", toDate, "")
 
 	transactions := []model.Transaction{}
-	err := repository.db.QueryItems(
+	encodedNextToken, err := repository.db.QueryItemsWithPagination(
 		ctx,
 		repository.tableName,
 		"PK = :pk AND SK BETWEEN :from AND :to",
@@ -150,13 +144,15 @@ func (repository *transactionRepository) ListWithinDateRange(ctx context.Context
 		},
 		"",
 		"",
+		limit,
+		nextToken,
 		&transactions,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("list transactions within date range: %w", err)
+		return nil, "", fmt.Errorf("list transactions within date range: %w", err)
 	}
 
-	return transactions, nil
+	return transactions, encodedNextToken, nil
 }
 
 func (repository *transactionRepository) GetByKey(ctx context.Context, id string, ownerID string) (*model.Transaction, error) {

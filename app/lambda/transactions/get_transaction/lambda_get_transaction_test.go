@@ -25,6 +25,10 @@ func (m *mockTransactionService) CreateTransaction(ctx context.Context, walletID
 	return nil
 }
 
+func (m *mockTransactionService) GetTransactionsBetweenPeriod(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, nextToken string) ([]model.Transaction, string, error) {
+	return nil, "", nil
+}
+
 func TestGetTransactionLambda_Handle(t *testing.T) {
 	sampleTransaction := &model.Transaction{
 		ID:           "tx123",

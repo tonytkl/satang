@@ -34,6 +34,10 @@ func (m *MockTransactionService) GetTransaction(ctx context.Context, transaction
 	return nil, nil
 }
 
+func (m *MockTransactionService) GetTransactionsBetweenPeriod(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, nextToken string) ([]model.Transaction, string, error) {
+	return nil, "", nil
+}
+
 func TestHandle_ValidPayload(t *testing.T) {
 	payload := createTransactionRequest{
 		WalletID:     "wallet-123",

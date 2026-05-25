@@ -9,6 +9,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -165,6 +166,76 @@ func TestDynamoDBQueryItems(t *testing.T) {
 		{ID: "txn-2", UserID: "user-1", Amount: 100},
 	}
 	assert.Equal(t, want, got)
+}
+
+func TestDynamoDBQueryItemsWithPagination(t *testing.T) {
+	nextToken, err := encodePaginationToken(map[string]types.AttributeValue{
+		"PK": &types.AttributeValueMemberS{Value: "USER#user-1"},
+		"SK": &types.AttributeValueMemberS{Value: "TX#2026-04-01#tx-1"},
+	})
+	require.NoError(t, err)
+
+	client := newTestClient(t, func(t *testing.T, writer http.ResponseWriter, request *http.Request, payload map[string]any) {
+		assert.Equal(t, "DynamoDB_20120810.Query", request.Header.Get("X-Amz-Target"))
+		assert.Equal(t, "transactions", payload["TableName"])
+		assert.Equal(t, float64(10), payload["Limit"])
+
+		startKey := payload["ExclusiveStartKey"].(map[string]any)
+		assert.Equal(t, "USER#user-1", startKey["PK"].(map[string]any)["S"])
+		assert.Equal(t, "TX#2026-04-01#tx-1", startKey["SK"].(map[string]any)["S"])
+
+		writeJSON(t, writer, map[string]any{
+			"Items": []map[string]any{
+				{
+					"id":      map[string]any{"S": "txn-3"},
+					"user_id": map[string]any{"S": "user-1"},
+					"amount":  map[string]any{"N": "200"},
+				},
+			},
+			"LastEvaluatedKey": map[string]any{
+				"PK": map[string]any{"S": "USER#user-1"},
+				"SK": map[string]any{"S": "TX#2026-04-02#tx-2"},
+			},
+		})
+	})
+
+	var got []testTransaction
+	returnedToken, err := client.QueryItemsWithPagination(
+		context.Background(),
+		"transactions",
+		"user_id = :user_id",
+		map[string]any{":user_id": "user-1"},
+		"user-index",
+		"",
+		10,
+		nextToken,
+		&got,
+	)
+	require.NoError(t, err)
+	require.Len(t, got, 1)
+	assert.Equal(t, testTransaction{ID: "txn-3", UserID: "user-1", Amount: 200}, got[0])
+	assert.NotEmpty(t, returnedToken)
+}
+
+func TestDynamoDBQueryItemsWithPaginationInvalidToken(t *testing.T) {
+	client := newTestClient(t, func(t *testing.T, writer http.ResponseWriter, request *http.Request, payload map[string]any) {
+		writeJSON(t, writer, map[string]any{})
+	})
+
+	var got []testTransaction
+	_, err := client.QueryItemsWithPagination(
+		context.Background(),
+		"transactions",
+		"user_id = :user_id",
+		map[string]any{":user_id": "user-1"},
+		"user-index",
+		"",
+		10,
+		"not-base64",
+		&got,
+	)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "decode pagination token")
 }
 
 func TestDynamoDBScanItems(t *testing.T) {

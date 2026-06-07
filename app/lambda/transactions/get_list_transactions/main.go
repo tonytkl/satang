@@ -1,4 +1,4 @@
-package getlisttransactions
+package main
 
 import (
 	"context"

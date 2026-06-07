@@ -27,6 +27,19 @@ module "api_route_get_transaction" {
   lambda_permission_statement_id = "AllowExecutionFromAPIGatewayGetTransaction"
 }
 
+module "api_route_get_list_transactions" {
+  source = "./api_route/get_list_transactions"
+
+  api_id                         = aws_apigatewayv2_api.satang_api.id
+  api_execution_arn              = aws_apigatewayv2_api.satang_api.execution_arn
+  integration_uri                = module.lambda_get_list_transactions.get_list_transactions_invoke_arn
+  integration_method             = "GET"
+  route_key                      = "GET /api/v1.0/transactions"
+  lambda_function_name           = module.lambda_get_list_transactions.get_list_transactions_function_name
+  lambda_permission_statement_id = "AllowExecutionFromAPIGatewayGetListTransactions"
+}
+
+
 resource "aws_apigatewayv2_stage" "default" {
   api_id      = aws_apigatewayv2_api.satang_api.id
   name        = "$default"

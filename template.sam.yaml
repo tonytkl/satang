@@ -1,0 +1,69 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Satang local SAM template (HTTP API -> Lambda -> DynamoDB Local)
+
+Parameters:
+  TableName:
+    Type: String
+    Default: satang-dynamodb
+  DynamoDbEndpoint:
+    Type: String
+    Default: http://host.docker.internal:8000
+
+Globals:
+  Function:
+    Runtime: go1.x
+    Architectures:
+      - x86_64
+    Timeout: 15
+    MemorySize: 128
+    Environment:
+      Variables:
+        ENVIRONMENT: local
+        TABLE_NAME: !Ref TableName
+        AWS_DYNAMODB_ENDPOINT: !Ref DynamoDbEndpoint
+
+Resources:
+  SatangLocalHttpApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      StageName: local
+
+  CreateTransactionFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: app/lambda/transactions/create_transaction
+      Handler: bootstrap
+      Events:
+        CreateTransactionApi:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref SatangLocalHttpApi
+            Path: /api/v1.0/transactions
+            Method: POST
+
+  GetListTransactionsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: app/lambda/transactions/get_list_transactions
+      Handler: bootstrap
+      Events:
+        GetListTransactionsApi:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref SatangLocalHttpApi
+            Path: /api/v1.0/transactions
+            Method: GET
+
+  GetTransactionFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: app/lambda/transactions/get_transaction
+      Handler: bootstrap
+      Events:
+        GetTransactionApi:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref SatangLocalHttpApi
+            Path: /api/v1.0/transactions/{transaction_id}
+            Method: GET

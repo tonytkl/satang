@@ -32,7 +32,7 @@ app/
 From the repository root, run:
 
 ```bash
-docker compose up -d
+make local-dynamodb-up
 ```
 
 This starts `amazon/dynamodb-local` on port `8000`.

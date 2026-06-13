@@ -6,3 +6,4 @@
 *.db
 aws/*
 coverage.out
+.aws-sam

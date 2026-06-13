@@ -12,7 +12,7 @@ Parameters:
 
 Globals:
   Function:
-    Runtime: go1.x
+    Runtime: provided.al2023
     Architectures:
       - x86_64
     Timeout: 15
@@ -31,6 +31,8 @@ Resources:
 
   CreateTransactionFunction:
     Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: go1.x
     Properties:
       CodeUri: app/lambda/transactions/create_transaction
       Handler: bootstrap
@@ -44,6 +46,8 @@ Resources:
 
   GetListTransactionsFunction:
     Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: go1.x
     Properties:
       CodeUri: app/lambda/transactions/get_list_transactions
       Handler: bootstrap
@@ -57,6 +61,8 @@ Resources:
 
   GetTransactionFunction:
     Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: go1.x
     Properties:
       CodeUri: app/lambda/transactions/get_transaction
       Handler: bootstrap

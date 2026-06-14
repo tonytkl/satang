@@ -2,7 +2,7 @@ LAMBDA_MAIN_FILES := $(shell find app/lambda -type f -name main.go)
 LAMBDA_ARTIFACT_DIR := aws/lambda
 LAMBDA_BUILD_DIR := $(LAMBDA_ARTIFACT_DIR)/build
 
-.PHONY: all build-lambdas zip-lambdas clean
+.PHONY: build-lambdas zip-lambdas clean
 
 SAM_TEMPLATE := template.sam.yaml
 SAM_BUILD_TEMPLATE := .aws-sam/build/template.yaml
@@ -10,8 +10,6 @@ LOCAL_API_PORT := 3000
 LOCAL_DOCKER_COMPOSE_FILE := docker-compose.local.yml
 SAM_LOCAL_REGION := ap-southeast-1
 SAM_LOCAL_ENV := AWS_SHARED_CREDENTIALS_FILE=/dev/null AWS_CONFIG_FILE=/dev/null AWS_REGION=$(SAM_LOCAL_REGION) DOCKER_HOST=$$(docker context inspect $$(docker context show) --format '{{.Endpoints.docker.Host}}')
-
-all: zip-lambdas
 
 build-lambdas:
 	@mkdir -p "$(LAMBDA_BUILD_DIR)"
@@ -39,7 +37,7 @@ clean:
 	@rm -rf "$(LAMBDA_BUILD_DIR)"
 	@rm -f "$(LAMBDA_ARTIFACT_DIR)"/*.zip
 
-.PHONY: local-dynamodb-up local-dynamodb-init local-dynamodb-down sam-build sam-local-api sam-local-stop local-up
+.PHONY: local-dynamodb-up local-dynamodb-init local-dynamodb-down sam-build sam-local-api sam-local-stop local-up full-local-build
 
 local-dynamodb-up:
 	docker compose -f $(LOCAL_DOCKER_COMPOSE_FILE) up -d dynamodb-local
@@ -53,6 +51,9 @@ local-dynamodb-down:
 sam-build:
 	$(SAM_LOCAL_ENV) sam build --template-file $(SAM_TEMPLATE) --region $(SAM_LOCAL_REGION)
 
+full-local-build: build-lambdas sam-build
+	@echo "Lambda artifacts and SAM build template are refreshed."
+
 sam-local-api:
 	$(SAM_LOCAL_ENV) sam local start-api \
 		--template $(SAM_BUILD_TEMPLATE) \
@@ -61,6 +62,6 @@ sam-local-api:
 		--region $(SAM_LOCAL_REGION) \
 		--add-host host.docker.internal:host-gateway
 
-local-up: local-dynamodb-up local-dynamodb-init sam-build
+local-up: local-dynamodb-up local-dynamodb-init full-local-build
 	@echo "Local dependencies are ready."
 	@echo "Run 'make sam-local-api' to start API Gateway + Lambda locally on port $(LOCAL_API_PORT)."

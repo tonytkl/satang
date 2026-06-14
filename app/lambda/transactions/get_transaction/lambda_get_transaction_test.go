@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"testing"
 	"time"
@@ -11,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/tonytkl/satang/model"
 	"github.com/tonytkl/satang/repositories"
+	"github.com/tonytkl/satang/schemas"
 )
 
 type mockTransactionService struct {
@@ -34,11 +36,29 @@ func TestGetTransactionLambda_Handle(t *testing.T) {
 		ID:           "tx123",
 		WalletID:     "wallet1",
 		WalletName:   "Main Wallet",
+		Type:         model.TransactionTypeExpense,
 		Amount:       100.0,
 		Currency:     "USD",
 		CategoryID:   "cat1",
 		CategoryName: "Food",
+		Date:         time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC),
 		OwnerID:      "user1",
+		CreatedAt:    time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC),
+		UpdatedAt:    time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC),
+	}
+	sampleSchema := schemas.TransactionSchemas{
+		ID:           sampleTransaction.ID,
+		WalletID:     sampleTransaction.WalletID,
+		WalletName:   sampleTransaction.WalletName,
+		Type:         sampleTransaction.Type,
+		Amount:       sampleTransaction.Amount,
+		Currency:     sampleTransaction.Currency,
+		CategoryID:   sampleTransaction.CategoryID,
+		CategoryName: sampleTransaction.CategoryName,
+		Date:         sampleTransaction.Date,
+		OwnerID:      sampleTransaction.OwnerID,
+		CreatedAt:    sampleTransaction.CreatedAt,
+		UpdatedAt:    sampleTransaction.UpdatedAt,
 	}
 
 	tests := []struct {
@@ -46,6 +66,7 @@ func TestGetTransactionLambda_Handle(t *testing.T) {
 		transactionID  string
 		service        *mockTransactionService
 		wantStatusCode int
+		wantSchema     *schemas.TransactionSchemas
 		wantBody       string
 	}{
 		{
@@ -57,7 +78,7 @@ func TestGetTransactionLambda_Handle(t *testing.T) {
 				},
 			},
 			wantStatusCode: 200,
-			wantBody:       "\"tx123\"", // Only check for transaction ID in body
+			wantSchema:     &sampleSchema,
 		},
 		{
 			name:          "not found",
@@ -103,7 +124,14 @@ func TestGetTransactionLambda_Handle(t *testing.T) {
 			resp, err := handler.Handle(context.Background(), req)
 			require.NoError(t, err)
 			assert.Equal(t, tt.wantStatusCode, resp.StatusCode)
-			assert.Contains(t, resp.Body, tt.wantBody)
+			if tt.wantSchema != nil {
+				var got schemas.TransactionSchemas
+				require.NoError(t, json.Unmarshal([]byte(resp.Body), &got))
+				assert.Equal(t, *tt.wantSchema, got)
+			}
+			if tt.wantBody != "" {
+				assert.Contains(t, resp.Body, tt.wantBody)
+			}
 		})
 	}
 }

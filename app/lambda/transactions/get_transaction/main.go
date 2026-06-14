@@ -10,7 +10,9 @@ import (
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/tonytkl/satang/clients"
+	"github.com/tonytkl/satang/model"
 	"github.com/tonytkl/satang/repositories"
+	"github.com/tonytkl/satang/schemas"
 	"github.com/tonytkl/satang/services"
 	"github.com/tonytkl/satang/utils"
 )
@@ -58,5 +60,10 @@ func (handler *getTransactionLambda) Handle(ctx context.Context, request events.
 		return utils.JsonResponse(http.StatusBadRequest, errorResponse{Message: err.Error()})
 	}
 
-	return utils.JsonResponse(http.StatusOK, transaction)
+	responseSchemas, err := schemas.BuildTransactionSchemas([]model.Transaction{*transaction})
+	if err != nil {
+		return utils.JsonResponse(http.StatusInternalServerError, errorResponse{Message: err.Error()})
+	}
+
+	return utils.JsonResponse(http.StatusOK, responseSchemas[0])
 }

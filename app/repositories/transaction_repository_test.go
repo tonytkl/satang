@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/tonytkl/satang/clients"
-	"github.com/tonytkl/satang/model"
+	"github.com/tonytkl/satang/models"
 )
 
 type mockDynamoDB struct {
@@ -86,8 +86,8 @@ func TestTransactionRepositoryCreateSuccess(t *testing.T) {
 		putItemFn: func(_ context.Context, table string, item any) error {
 			require.Equal(t, "transactions", table)
 
-			tx, ok := item.(*model.Transaction)
-			require.True(t, ok, "item type = %T, want *model.Transaction", item)
+			tx, ok := item.(*models.Transaction)
+			require.True(t, ok, "item type = %T, want *models.Transaction", item)
 
 			assert.Equal(t, "USER#user-1", tx.PK)
 			assert.Equal(t, "TX#2026-04-15#tx-1", tx.SK)
@@ -105,7 +105,7 @@ func TestTransactionRepositoryCreateSuccess(t *testing.T) {
 	}
 
 	repo := NewTransactionRepository(mock, "transactions")
-	tx := &model.Transaction{
+	tx := &models.Transaction{
 		ID:         "tx-1",
 		OwnerID:    "user-1",
 		WalletID:   "wallet-1",
@@ -131,9 +131,9 @@ func TestTransactionRepositoryListByGSISuccess(t *testing.T) {
 			assert.Equal(t, "TX#2026-04-01#", expressionValues[":from"])
 			assert.Equal(t, "TX#2026-04-30#", expressionValues[":to"])
 
-			dst, ok := out.(*[]model.Transaction)
-			require.True(t, ok, "out type = %T, want *[]model.Transaction", out)
-			*dst = []model.Transaction{{ID: "tx-1"}}
+			dst, ok := out.(*[]models.Transaction)
+			require.True(t, ok, "out type = %T, want *[]models.Transaction", out)
+			*dst = []models.Transaction{{ID: "tx-1"}}
 
 			return nil
 		},
@@ -168,8 +168,8 @@ func TestTransactionRepositoryListByGSIErrors(t *testing.T) {
 func TestTransactionRepositoryListByGSINotFound(t *testing.T) {
 	mock := &mockDynamoDB{
 		queryItemsFn: func(_ context.Context, _ string, _ string, _ map[string]any, _ string, _ string, out any) error {
-			dst := out.(*[]model.Transaction)
-			*dst = []model.Transaction{}
+			dst := out.(*[]models.Transaction)
+			*dst = []models.Transaction{}
 			return nil
 		},
 	}
@@ -193,8 +193,8 @@ func TestTransactionRepositoryListWithinDateRangeSuccess(t *testing.T) {
 			assert.Equal(t, "TX#2026-04-01#", expressionValues[":from"])
 			assert.Equal(t, "TX#2026-04-30#", expressionValues[":to"])
 
-			dst := out.(*[]model.Transaction)
-			*dst = []model.Transaction{{ID: "tx-1"}, {ID: "tx-2"}}
+			dst := out.(*[]models.Transaction)
+			*dst = []models.Transaction{{ID: "tx-1"}, {ID: "tx-2"}}
 			return "token-2", nil
 		},
 	}
@@ -216,8 +216,8 @@ func TestTransactionRepositoryGetByKeySuccess(t *testing.T) {
 			require.Equal(t, "GSI3_PK = :indexPK", keyConditionExpression)
 			assert.Equal(t, "TX_ID#tx-1", expressionValues[":indexPK"])
 
-			dst := out.(*[]model.Transaction)
-			*dst = []model.Transaction{{ID: "tx-1", PK: "USER#1"}}
+			dst := out.(*[]models.Transaction)
+			*dst = []models.Transaction{{ID: "tx-1", PK: "USER#1"}}
 			return nil
 		},
 	}
@@ -260,7 +260,7 @@ func TestTransactionRepositoryUpdateSuccess(t *testing.T) {
 	}
 
 	repo := NewTransactionRepository(mock, "transactions")
-	err := repo.Update(context.Background(), "user-1", "2026-04-20", "tx-1", &model.Transaction{
+	err := repo.Update(context.Background(), "user-1", "2026-04-20", "tx-1", &models.Transaction{
 		WalletID:     "wallet-2",
 		WalletName:   "Cash",
 		Amount:       999,
@@ -291,7 +291,7 @@ func TestTransactionRepositoryDeleteSuccess(t *testing.T) {
 func TestTransactionRepositoryUpdateAndDeleteErrorPaths(t *testing.T) {
 	repo := NewTransactionRepository(&mockDynamoDB{}, "transactions")
 
-	err := repo.Update(context.Background(), "", "2026-04-20", "tx-1", &model.Transaction{})
+	err := repo.Update(context.Background(), "", "2026-04-20", "tx-1", &models.Transaction{})
 	require.EqualError(t, err, "owner ID is required")
 
 	err = repo.Delete(context.Background(), "user-1", "bad-date", "tx-1")
@@ -316,7 +316,7 @@ func TestTransactionRepositoryDBErrorWrapping(t *testing.T) {
 
 	repo := NewTransactionRepository(mock, "transactions")
 
-	err := repo.Update(context.Background(), "user-1", "2026-04-20", "tx-1", &model.Transaction{
+	err := repo.Update(context.Background(), "user-1", "2026-04-20", "tx-1", &models.Transaction{
 		WalletID:   "wallet-1",
 		CategoryID: "cat-1",
 	})

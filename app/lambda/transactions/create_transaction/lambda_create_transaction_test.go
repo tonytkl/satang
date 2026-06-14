@@ -11,13 +11,13 @@ import (
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/tonytkl/satang/model"
+	"github.com/tonytkl/satang/models"
 )
 
 // MockTransactionService is a mock implementation of TransactionService
 type MockTransactionService struct {
 	CreateTransactionFunc func(ctx context.Context, walletID, walletName, categoryID, categoryName, description, currency, imageURL, transactionType string, amount float64, date time.Time, ownerID string) error
-	GetTransactionFunc    func(ctx context.Context, transactionID string) (*model.Transaction, error)
+	GetTransactionFunc    func(ctx context.Context, transactionID string) (*models.Transaction, error)
 }
 
 func (m *MockTransactionService) CreateTransaction(ctx context.Context, walletID, walletName, categoryID, categoryName, description, currency, imageURL, transactionType string, amount float64, date time.Time, ownerID string) error {
@@ -27,14 +27,14 @@ func (m *MockTransactionService) CreateTransaction(ctx context.Context, walletID
 	return nil
 }
 
-func (m *MockTransactionService) GetTransaction(ctx context.Context, transactionID string, ownerID string) (*model.Transaction, error) {
+func (m *MockTransactionService) GetTransaction(ctx context.Context, transactionID string, ownerID string) (*models.Transaction, error) {
 	if m.GetTransactionFunc != nil {
 		return m.GetTransactionFunc(ctx, transactionID)
 	}
 	return nil, nil
 }
 
-func (m *MockTransactionService) GetTransactionsBetweenPeriod(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, nextToken string) ([]model.Transaction, string, error) {
+func (m *MockTransactionService) GetTransactionsBetweenPeriod(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, nextToken string) ([]models.Transaction, string, error) {
 	return nil, "", nil
 }
 

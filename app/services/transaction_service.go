@@ -6,15 +6,15 @@ import (
 	"strings"
 	"time"
 
-	"github.com/tonytkl/satang/model"
+	"github.com/tonytkl/satang/models"
 	"github.com/tonytkl/satang/repositories"
 	"github.com/tonytkl/satang/utils"
 )
 
 type TransactionService interface {
 	CreateTransaction(ctx context.Context, walletID string, walletName string, categoryID string, categoryName string, description string, currency string, imageURL string, txType string, amount float64, date time.Time, ownerID string) error
-	GetTransaction(ctx context.Context, transactionID string, ownerID string) (*model.Transaction, error)
-	GetTransactionsBetweenPeriod(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, nextToken string) ([]model.Transaction, string, error)
+	GetTransaction(ctx context.Context, transactionID string, ownerID string) (*models.Transaction, error)
+	GetTransactionsBetweenPeriod(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, nextToken string) ([]models.Transaction, string, error)
 }
 
 type transactionService struct {
@@ -32,7 +32,7 @@ func (service *transactionService) CreateTransaction(ctx context.Context, wallet
 	if err != nil {
 		return err
 	}
-	transaction := model.NewTransaction(
+	transaction := models.NewTransaction(
 		walletID,
 		walletName,
 		categoryID,
@@ -54,7 +54,7 @@ func (service *transactionService) CreateTransaction(ctx context.Context, wallet
 	return nil
 }
 
-func (service *transactionService) GetTransaction(ctx context.Context, transactionID string, ownerID string) (*model.Transaction, error) {
+func (service *transactionService) GetTransaction(ctx context.Context, transactionID string, ownerID string) (*models.Transaction, error) {
 	if transactionID == "" {
 		return nil, errors.New("Transaction ID is required")
 	}
@@ -66,7 +66,7 @@ func (service *transactionService) GetTransaction(ctx context.Context, transacti
 	return service.repository.GetByKey(ctx, transactionID, ownerID)
 }
 
-func (service *transactionService) GetTransactionsBetweenPeriod(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, nextToken string) ([]model.Transaction, string, error) {
+func (service *transactionService) GetTransactionsBetweenPeriod(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, nextToken string) ([]models.Transaction, string, error) {
 	if ownerID == "" {
 		return nil, "", errors.New("owner ID is required")
 	}
@@ -85,21 +85,21 @@ func (service *transactionService) GetTransactionsBetweenPeriod(ctx context.Cont
 	return service.repository.ListWithinDateRange(ctx, ownerID, fromDate, toDate, limit, nextToken)
 }
 
-func getTransactionType(txType string) (model.TransactionType, error) {
+func getTransactionType(txType string) (models.TransactionType, error) {
 	if strings.ToLower(txType) == "income" {
-		return model.TransactionTypeIncome, nil
+		return models.TransactionTypeIncome, nil
 	}
 	if strings.ToLower(txType) == "expense" {
-		return model.TransactionTypeExpense, nil
+		return models.TransactionTypeExpense, nil
 	}
 	if strings.ToLower(txType) == "transfer" {
-		return model.TransactionTypeTransfer, nil
+		return models.TransactionTypeTransfer, nil
 	}
 	return "", errors.New("Valid transactiontion type is required")
 }
 
 // validateTransaction ensures the required transaction fields are present.
-func validateTransaction(transaction *model.Transaction) error {
+func validateTransaction(transaction *models.Transaction) error {
 	if transaction == nil {
 		return errors.New("Transaction is required")
 	}

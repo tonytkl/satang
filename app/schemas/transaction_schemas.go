@@ -6,14 +6,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/tonytkl/satang/model"
+	"github.com/tonytkl/satang/models"
 )
 
 type TransactionSchemas struct {
 	ID           string                `json:"id"`
 	WalletID     string                `json:"walletId"`
 	WalletName   string                `json:"walletName,omitempty"`
-	Type         model.TransactionType `json:"type"`
+	Type         models.TransactionType `json:"type"`
 	Amount       float64               `json:"amount"`
 	Currency     string                `json:"currency"`
 	CategoryID   string                `json:"categoryID"`
@@ -27,7 +27,7 @@ type TransactionSchemas struct {
 }
 
 // BuildTransactionSchemas maps model transactions to response schemas and validates required fields.
-func BuildTransactionSchemas(transactions []model.Transaction) ([]TransactionSchemas, error) {
+func BuildTransactionSchemas(transactions []models.Transaction) ([]TransactionSchemas, error) {
 	responseTransactions := make([]TransactionSchemas, 0, len(transactions))
 	for _, tx := range transactions {
 		schemaTransaction := TransactionSchemas{

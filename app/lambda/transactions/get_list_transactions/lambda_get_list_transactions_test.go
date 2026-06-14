@@ -83,6 +83,8 @@ func TestGetListTransactionsLambdaHandleSuccess(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, payload.Transactions, 1)
 	assert.Equal(t, "tx-1", payload.Transactions[0].ID)
+	assert.Equal(t, "wallet-1", payload.Transactions[0].WalletID)
+	assert.Equal(t, model.TransactionTypeExpense, payload.Transactions[0].Type)
 	assert.Equal(t, "next-token-2", payload.NextToken)
 }
 
@@ -141,4 +143,39 @@ func TestGetListTransactionsLambdaHandleServiceError(t *testing.T) {
 	err = json.Unmarshal([]byte(response.Body), &payload)
 	require.NoError(t, err)
 	assert.Equal(t, "database unavailable", payload.Message)
+}
+
+func TestGetListTransactionsLambdaHandleInvalidTransactionSchema(t *testing.T) {
+	handler := &getListTransactionsLambda{
+		service: &mockTransactionService{
+			getTransactionsBetweenPeriodFunc: func(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, nextToken string) ([]model.Transaction, string, error) {
+				return []model.Transaction{{
+					ID:         "",
+					WalletID:   "wallet-1",
+					Type:       model.TransactionTypeExpense,
+					Amount:     10,
+					Currency:   "THB",
+					CategoryID: "cat-1",
+					Date:       time.Date(2025, 5, 1, 0, 0, 0, 0, time.UTC),
+					OwnerID:    "1",
+				}}, "", nil
+			},
+		},
+	}
+
+	response, err := handler.Handle(context.Background(), events.APIGatewayV2HTTPRequest{
+		QueryStringParameters: map[string]string{
+			"fromDate": "2025-05-01",
+			"toDate":   "2025-05-31",
+		},
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusInternalServerError, response.StatusCode)
+
+	var payload errorResponse
+	err = json.Unmarshal([]byte(response.Body), &payload)
+	require.NoError(t, err)
+	assert.Contains(t, payload.Message, "transaction response schema validation failed")
+	assert.Contains(t, payload.Message, "id is required")
 }

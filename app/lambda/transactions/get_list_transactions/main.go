@@ -12,8 +12,8 @@ import (
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/tonytkl/satang/clients"
-	"github.com/tonytkl/satang/model"
 	"github.com/tonytkl/satang/repositories"
+	"github.com/tonytkl/satang/schemas"
 	"github.com/tonytkl/satang/services"
 	"github.com/tonytkl/satang/utils"
 )
@@ -27,8 +27,8 @@ type getListTransactionsLambda struct {
 }
 
 type getListTransactionResponse struct {
-	Transactions []model.Transaction `json:"transactions"`
-	NextToken    string              `json:"nextToken"`
+	Transactions []schemas.TransactionSchemas `json:"transactions"`
+	NextToken    string                       `json:"nextToken"`
 }
 
 func main() {
@@ -100,8 +100,13 @@ func (handler *getListTransactionsLambda) Handle(ctx context.Context, request ev
 		return utils.JsonResponse(http.StatusInternalServerError, errorResponse{Message: err.Error()})
 	}
 
+	responseTransactions, err := schemas.BuildTransactionSchemas(transactions)
+	if err != nil {
+		return utils.JsonResponse(http.StatusInternalServerError, errorResponse{Message: err.Error()})
+	}
+
 	response := getListTransactionResponse{
-		Transactions: transactions,
+		Transactions: responseTransactions,
 		NextToken:    nextToken,
 	}
 	return utils.JsonResponse(http.StatusOK, response)

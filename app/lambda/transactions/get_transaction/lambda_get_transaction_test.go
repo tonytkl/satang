@@ -10,16 +10,14 @@ import (
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/tonytkl/satang/models"
-	"github.com/tonytkl/satang/repositories"
-	"github.com/tonytkl/satang/schemas"
+	"github.com/tonytkl/satang/transaction"
 )
 
 type mockTransactionService struct {
-	getTransactionFunc func(ctx context.Context, transactionID string) (*models.Transaction, error)
+	getTransactionFunc func(ctx context.Context, transactionID string) (*transaction.Transaction, error)
 }
 
-func (m *mockTransactionService) GetTransaction(ctx context.Context, transactionID string, ownerID string) (*models.Transaction, error) {
+func (m *mockTransactionService) GetTransaction(ctx context.Context, transactionID string, ownerID string) (*transaction.Transaction, error) {
 	return m.getTransactionFunc(ctx, transactionID)
 }
 
@@ -27,16 +25,16 @@ func (m *mockTransactionService) CreateTransaction(ctx context.Context, walletID
 	return nil
 }
 
-func (m *mockTransactionService) GetTransactionsBetweenPeriod(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, nextToken string) ([]models.Transaction, string, error) {
+func (m *mockTransactionService) GetTransactionsBetweenPeriod(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, nextToken string) ([]transaction.Transaction, string, error) {
 	return nil, "", nil
 }
 
 func TestGetTransactionLambda_Handle(t *testing.T) {
-	sampleTransaction := &models.Transaction{
+	sampleTransaction := &transaction.Transaction{
 		ID:           "tx123",
 		WalletID:     "wallet1",
 		WalletName:   "Main Wallet",
-		Type:         models.TransactionTypeExpense,
+		Type:         transaction.TransactionTypeExpense,
 		Amount:       100.0,
 		Currency:     "USD",
 		CategoryID:   "cat1",
@@ -46,7 +44,7 @@ func TestGetTransactionLambda_Handle(t *testing.T) {
 		CreatedAt:    time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC),
 		UpdatedAt:    time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC),
 	}
-	sampleSchema := schemas.TransactionSchemas{
+	sampleSchema := transaction.TransactionSchemas{
 		ID:           sampleTransaction.ID,
 		WalletID:     sampleTransaction.WalletID,
 		WalletName:   sampleTransaction.WalletName,
@@ -66,14 +64,14 @@ func TestGetTransactionLambda_Handle(t *testing.T) {
 		transactionID  string
 		service        *mockTransactionService
 		wantStatusCode int
-		wantSchema     *schemas.TransactionSchemas
+		wantSchema     *transaction.TransactionSchemas
 		wantBody       string
 	}{
 		{
 			name:          "success",
 			transactionID: "tx123",
 			service: &mockTransactionService{
-				getTransactionFunc: func(ctx context.Context, transactionID string) (*models.Transaction, error) {
+				getTransactionFunc: func(ctx context.Context, transactionID string) (*transaction.Transaction, error) {
 					return sampleTransaction, nil
 				},
 			},
@@ -84,18 +82,18 @@ func TestGetTransactionLambda_Handle(t *testing.T) {
 			name:          "not found",
 			transactionID: "notfound",
 			service: &mockTransactionService{
-				getTransactionFunc: func(ctx context.Context, transactionID string) (*models.Transaction, error) {
-					return nil, repositories.ErrTransactionNotFound
+				getTransactionFunc: func(ctx context.Context, transactionID string) (*transaction.Transaction, error) {
+					return nil, transaction.ErrTransactionNotFound
 				},
 			},
 			wantStatusCode: 404,
-			wantBody:       "transaction not found",
+			wantBody:       "Transaction not found",
 		},
 		{
 			name:          "service error",
 			transactionID: "err",
 			service: &mockTransactionService{
-				getTransactionFunc: func(ctx context.Context, transactionID string) (*models.Transaction, error) {
+				getTransactionFunc: func(ctx context.Context, transactionID string) (*transaction.Transaction, error) {
 					return nil, errors.New("db error")
 				},
 			},
@@ -106,7 +104,7 @@ func TestGetTransactionLambda_Handle(t *testing.T) {
 			name:          "missing transaction_id",
 			transactionID: "",
 			service: &mockTransactionService{
-				getTransactionFunc: func(ctx context.Context, transactionID string) (*models.Transaction, error) {
+				getTransactionFunc: func(ctx context.Context, transactionID string) (*transaction.Transaction, error) {
 					return nil, errors.New("Transaction ID is required")
 				},
 			},
@@ -125,7 +123,7 @@ func TestGetTransactionLambda_Handle(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, tt.wantStatusCode, resp.StatusCode)
 			if tt.wantSchema != nil {
-				var got schemas.TransactionSchemas
+				var got transaction.TransactionSchemas
 				require.NoError(t, json.Unmarshal([]byte(resp.Body), &got))
 				assert.Equal(t, *tt.wantSchema, got)
 			}

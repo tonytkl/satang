@@ -1,4 +1,4 @@
-package repositories
+package transaction
 
 import (
 	"context"
@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/tonytkl/satang/clients"
-	"github.com/tonytkl/satang/models"
 	"github.com/tonytkl/satang/utils"
 )
 
@@ -16,11 +15,11 @@ var ErrTransactionNotFound = errors.New("transaction not found")
 
 // TransactionRepository defines persistence operations for transactions.
 type TransactionRepository interface {
-	Create(ctx context.Context, transaction *models.Transaction) error
-	ListByGSI(ctx context.Context, indexName string, indexPartitionKeyPrefix string, targetID string, ownerID string, fromDate *time.Time, toDate *time.Time) ([]models.Transaction, error)
-	ListWithinDateRange(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, nextToken string) ([]models.Transaction, string, error)
-	GetByKey(ctx context.Context, id string, ownerID string) (*models.Transaction, error)
-	Update(ctx context.Context, ownerID string, transactionDate string, transactionID string, transaction *models.Transaction) error
+	Create(ctx context.Context, transaction *Transaction) error
+	ListByGSI(ctx context.Context, indexName string, indexPartitionKeyPrefix string, targetID string, ownerID string, fromDate *time.Time, toDate *time.Time) ([]Transaction, error)
+	ListWithinDateRange(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, nextToken string) ([]Transaction, string, error)
+	GetByKey(ctx context.Context, id string, ownerID string) (*Transaction, error)
+	Update(ctx context.Context, ownerID string, transactionDate string, transactionID string, transaction *Transaction) error
 	Delete(ctx context.Context, ownerID string, transactionDate string, transactionID string) error
 }
 
@@ -38,7 +37,7 @@ func NewTransactionRepository(db clients.DynamoDBClient, tableName string) Trans
 }
 
 // Create stores a transaction and populates its derived keys and timestamps.
-func (repository *transactionRepository) Create(ctx context.Context, transaction *models.Transaction) error {
+func (repository *transactionRepository) Create(ctx context.Context, transaction *Transaction) error {
 	sortingKey := utils.GetSortingKey("TX", transaction.Date, transaction.ID)
 
 	transaction.PK = utils.GetPartitionKey("USER", transaction.OwnerID)
@@ -69,7 +68,7 @@ func (repository *transactionRepository) Create(ctx context.Context, transaction
 }
 
 // ListByGSI lists transactions using the provided GSI name and partition key prefix.
-func (repository *transactionRepository) ListByGSI(ctx context.Context, indexName string, indexPartitionKeyPrefix string, targetID string, ownerID string, fromDate *time.Time, toDate *time.Time) ([]models.Transaction, error) {
+func (repository *transactionRepository) ListByGSI(ctx context.Context, indexName string, indexPartitionKeyPrefix string, targetID string, ownerID string, fromDate *time.Time, toDate *time.Time) ([]Transaction, error) {
 	if targetID == "" || indexName == "" || indexPartitionKeyPrefix == "" {
 		return nil, errors.New("index name, index partition key prefix, and target ID are required")
 	}
@@ -104,7 +103,7 @@ func (repository *transactionRepository) ListByGSI(ctx context.Context, indexNam
 		expressionValues[":to"] = utils.GetSortingKey("TX", *toDate, "")
 	}
 
-	transactions := []models.Transaction{}
+	transactions := []Transaction{}
 
 	err = repository.db.QueryItems(
 		ctx,
@@ -124,7 +123,7 @@ func (repository *transactionRepository) ListByGSI(ctx context.Context, indexNam
 }
 
 // ListWithinDateRange lists transactions for a user within a date range.
-func (repository *transactionRepository) ListWithinDateRange(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, nextToken string) ([]models.Transaction, string, error) {
+func (repository *transactionRepository) ListWithinDateRange(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, nextToken string) ([]Transaction, string, error) {
 	if fromDate.After(toDate) {
 		return nil, "", errors.New("from date must not be after to date")
 	}
@@ -132,7 +131,7 @@ func (repository *transactionRepository) ListWithinDateRange(ctx context.Context
 	fromSK := utils.GetSortingKey("TX", fromDate, "")
 	toSK := utils.GetSortingKey("TX", toDate, "")
 
-	transactions := []models.Transaction{}
+	transactions := []Transaction{}
 	encodedNextToken, err := repository.db.QueryItemsWithPagination(
 		ctx,
 		repository.tableName,
@@ -155,7 +154,7 @@ func (repository *transactionRepository) ListWithinDateRange(ctx context.Context
 	return transactions, encodedNextToken, nil
 }
 
-func (repository *transactionRepository) GetByKey(ctx context.Context, id string, ownerID string) (*models.Transaction, error) {
+func (repository *transactionRepository) GetByKey(ctx context.Context, id string, ownerID string) (*Transaction, error) {
 	transactions, err := repository.ListByGSI(ctx, "GSI3", "TX_ID", id, ownerID, nil, nil)
 
 	if err != nil {
@@ -170,7 +169,7 @@ func (repository *transactionRepository) GetByKey(ctx context.Context, id string
 }
 
 // Update modifies mutable attributes of an existing transaction.
-func (repository *transactionRepository) Update(ctx context.Context, ownerID string, transactionDate string, transactionID string, transaction *models.Transaction) error {
+func (repository *transactionRepository) Update(ctx context.Context, ownerID string, transactionDate string, transactionID string, transaction *Transaction) error {
 	if ownerID == "" {
 		return errors.New("owner ID is required")
 	}

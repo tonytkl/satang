@@ -12,9 +12,7 @@ import (
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/tonytkl/satang/clients"
-	"github.com/tonytkl/satang/repositories"
-	"github.com/tonytkl/satang/schemas"
-	"github.com/tonytkl/satang/services"
+	"github.com/tonytkl/satang/transaction"
 	"github.com/tonytkl/satang/utils"
 )
 
@@ -23,12 +21,12 @@ type errorResponse struct {
 }
 
 type getListTransactionsLambda struct {
-	service services.TransactionService
+	service transaction.TransactionService
 }
 
 type getListTransactionResponse struct {
-	Transactions []schemas.TransactionSchemas `json:"transactions"`
-	NextToken    string                       `json:"nextToken"`
+	Transactions []transaction.TransactionSchemas `json:"transactions"`
+	NextToken    string                           `json:"nextToken"`
 }
 
 func main() {
@@ -43,8 +41,8 @@ func main() {
 		panic("TABLE_NAME is required")
 	}
 
-	repository := repositories.NewTransactionRepository(db, tableName)
-	transactionService := services.NewTransactionService(repository)
+	repository := transaction.NewTransactionRepository(db, tableName)
+	transactionService := transaction.NewTransactionService(repository)
 
 	handler := getListTransactionsLambda{service: transactionService}
 
@@ -100,7 +98,7 @@ func (handler *getListTransactionsLambda) Handle(ctx context.Context, request ev
 		return utils.JsonResponse(http.StatusInternalServerError, errorResponse{Message: err.Error()})
 	}
 
-	responseTransactions, err := schemas.BuildTransactionSchemas(transactions)
+	responseTransactions, err := transaction.BuildTransactionSchemas(transactions)
 	if err != nil {
 		return utils.JsonResponse(http.StatusInternalServerError, errorResponse{Message: err.Error()})
 	}

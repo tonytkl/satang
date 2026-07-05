@@ -1,33 +1,31 @@
-package schemas
+package transaction
 
 import (
 	"errors"
 	"fmt"
 	"strings"
 	"time"
-
-	"github.com/tonytkl/satang/models"
 )
 
 type TransactionSchemas struct {
-	ID           string                `json:"id"`
-	WalletID     string                `json:"walletId"`
-	WalletName   string                `json:"walletName,omitempty"`
-	Type         models.TransactionType `json:"type"`
-	Amount       float64               `json:"amount"`
-	Currency     string                `json:"currency"`
-	CategoryID   string                `json:"categoryID"`
-	CategoryName string                `json:"categoryName,omitempty"`
-	Description  *string               `json:"description,omitempty"`
-	Date         time.Time             `json:"date"`
-	ImageURL     *string               `json:"imageURL,omitempty"`
-	OwnerID      string                `json:"ownerID"`
-	CreatedAt    time.Time             `json:"createdAt"`
-	UpdatedAt    time.Time             `json:"updatedAt"`
+	ID           string          `json:"id"`
+	WalletID     string          `json:"walletId"`
+	WalletName   string          `json:"walletName,omitempty"`
+	Type         TransactionType `json:"type"`
+	Amount       float64         `json:"amount"`
+	Currency     string          `json:"currency"`
+	CategoryID   string          `json:"categoryID"`
+	CategoryName string          `json:"categoryName,omitempty"`
+	Description  *string         `json:"description,omitempty"`
+	Date         time.Time       `json:"date"`
+	ImageURL     *string         `json:"imageURL,omitempty"`
+	OwnerID      string          `json:"ownerID"`
+	CreatedAt    time.Time       `json:"createdAt"`
+	UpdatedAt    time.Time       `json:"updatedAt"`
 }
 
 // BuildTransactionSchemas maps model transactions to response schemas and validates required fields.
-func BuildTransactionSchemas(transactions []models.Transaction) ([]TransactionSchemas, error) {
+func BuildTransactionSchemas(transactions []Transaction) ([]TransactionSchemas, error) {
 	responseTransactions := make([]TransactionSchemas, 0, len(transactions))
 	for _, tx := range transactions {
 		schemaTransaction := TransactionSchemas{

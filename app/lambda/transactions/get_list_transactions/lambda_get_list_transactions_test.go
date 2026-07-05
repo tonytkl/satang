@@ -11,22 +11,22 @@ import (
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/tonytkl/satang/models"
+	"github.com/tonytkl/satang/transaction"
 )
 
 type mockTransactionService struct {
-	getTransactionsBetweenPeriodFunc func(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, nextToken string) ([]models.Transaction, string, error)
+	getTransactionsBetweenPeriodFunc func(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, nextToken string) ([]transaction.Transaction, string, error)
 }
 
 func (m *mockTransactionService) CreateTransaction(ctx context.Context, walletID, walletName, categoryID, categoryName, description, currency, imageURL, txType string, amount float64, date time.Time, ownerID string) error {
 	return nil
 }
 
-func (m *mockTransactionService) GetTransaction(ctx context.Context, transactionID string, ownerID string) (*models.Transaction, error) {
+func (m *mockTransactionService) GetTransaction(ctx context.Context, transactionID string, ownerID string) (*transaction.Transaction, error) {
 	return nil, nil
 }
 
-func (m *mockTransactionService) GetTransactionsBetweenPeriod(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, nextToken string) ([]models.Transaction, string, error) {
+func (m *mockTransactionService) GetTransactionsBetweenPeriod(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, nextToken string) ([]transaction.Transaction, string, error) {
 	if m.getTransactionsBetweenPeriodFunc != nil {
 		return m.getTransactionsBetweenPeriodFunc(ctx, ownerID, fromDate, toDate, limit, nextToken)
 	}
@@ -41,18 +41,18 @@ func TestGetListTransactionsLambdaHandleSuccess(t *testing.T) {
 
 	handler := &getListTransactionsLambda{
 		service: &mockTransactionService{
-			getTransactionsBetweenPeriodFunc: func(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, nextToken string) ([]models.Transaction, string, error) {
+			getTransactionsBetweenPeriodFunc: func(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, nextToken string) ([]transaction.Transaction, string, error) {
 				assert.Equal(t, "1", ownerID)
 				assert.True(t, expectedFromDate.Equal(fromDate))
 				assert.True(t, expectedToDate.Equal(toDate))
 				assert.Equal(t, expectedLimit, limit)
 				assert.Equal(t, expectedNextToken, nextToken)
 
-				return []models.Transaction{{
+				return []transaction.Transaction{{
 					ID:           "tx-1",
 					WalletID:     "wallet-1",
 					WalletName:   "Cash",
-					Type:         models.TransactionTypeExpense,
+					Type:         transaction.TransactionTypeExpense,
 					Amount:       120.50,
 					Currency:     "THB",
 					CategoryID:   "cat-1",
@@ -84,7 +84,7 @@ func TestGetListTransactionsLambdaHandleSuccess(t *testing.T) {
 	require.Len(t, payload.Transactions, 1)
 	assert.Equal(t, "tx-1", payload.Transactions[0].ID)
 	assert.Equal(t, "wallet-1", payload.Transactions[0].WalletID)
-	assert.Equal(t, models.TransactionTypeExpense, payload.Transactions[0].Type)
+	assert.Equal(t, transaction.TransactionTypeExpense, payload.Transactions[0].Type)
 	assert.Equal(t, "next-token-2", payload.NextToken)
 }
 
@@ -123,7 +123,7 @@ func TestGetListTransactionsLambdaHandleInvalidFromDate(t *testing.T) {
 func TestGetListTransactionsLambdaHandleServiceError(t *testing.T) {
 	handler := &getListTransactionsLambda{
 		service: &mockTransactionService{
-			getTransactionsBetweenPeriodFunc: func(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, nextToken string) ([]models.Transaction, string, error) {
+			getTransactionsBetweenPeriodFunc: func(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, nextToken string) ([]transaction.Transaction, string, error) {
 				return nil, "", errors.New("database unavailable")
 			},
 		},
@@ -148,11 +148,11 @@ func TestGetListTransactionsLambdaHandleServiceError(t *testing.T) {
 func TestGetListTransactionsLambdaHandleInvalidTransactionSchema(t *testing.T) {
 	handler := &getListTransactionsLambda{
 		service: &mockTransactionService{
-			getTransactionsBetweenPeriodFunc: func(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, nextToken string) ([]models.Transaction, string, error) {
-				return []models.Transaction{{
+			getTransactionsBetweenPeriodFunc: func(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, nextToken string) ([]transaction.Transaction, string, error) {
+				return []transaction.Transaction{{
 					ID:         "",
 					WalletID:   "wallet-1",
-					Type:       models.TransactionTypeExpense,
+					Type:       transaction.TransactionTypeExpense,
 					Amount:     10,
 					Currency:   "THB",
 					CategoryID: "cat-1",

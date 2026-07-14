@@ -1,4 +1,4 @@
-package repositories
+package wallet
 
 import (
 	"context"
@@ -7,14 +7,13 @@ import (
 	"time"
 
 	"github.com/tonytkl/satang/clients"
-	"github.com/tonytkl/satang/models"
 	"github.com/tonytkl/satang/utils"
 )
 
 type WalletRepository interface {
-	Create(ctx context.Context, wallet *models.Wallet) error
-	GetWalletList(ctx context.Context, ownerID string) ([]models.Wallet, error)
-	GetWallet(ctx context.Context, ownerID string, walletID string) (*models.Wallet, error)
+	Create(ctx context.Context, wallet *Wallet) error
+	GetWalletList(ctx context.Context, ownerID string) ([]Wallet, error)
+	GetWallet(ctx context.Context, ownerID string, walletID string) (*Wallet, error)
 }
 
 type walletRepository struct {
@@ -29,7 +28,7 @@ func NewWalletRepository(db clients.DynamoDBClient, tableName string) WalletRepo
 	}
 }
 
-func (repository *walletRepository) Create(ctx context.Context, wallet *models.Wallet) error {
+func (repository *walletRepository) Create(ctx context.Context, wallet *Wallet) error {
 	wallet.PK = utils.GetPartitionKey("USER", wallet.OwnerID)
 	wallet.SK = utils.GetPartitionKey("WALLET", wallet.ID)
 
@@ -50,7 +49,7 @@ func (repository *walletRepository) Create(ctx context.Context, wallet *models.W
 	return nil
 }
 
-func (repository *walletRepository) GetWalletList(ctx context.Context, ownerID string) ([]models.Wallet, error) {
+func (repository *walletRepository) GetWalletList(ctx context.Context, ownerID string) ([]Wallet, error) {
 	if ownerID == "" {
 		return nil, errors.New("owner ID is required")
 	}
@@ -61,7 +60,7 @@ func (repository *walletRepository) GetWalletList(ctx context.Context, ownerID s
 		":walletSKPrefix": "WALLET#",
 	}
 
-	wallets := []models.Wallet{}
+	wallets := []Wallet{}
 
 	err := repository.db.QueryItems(
 		ctx,
@@ -80,7 +79,7 @@ func (repository *walletRepository) GetWalletList(ctx context.Context, ownerID s
 	return wallets, nil
 }
 
-func (repository *walletRepository) GetWallet(ctx context.Context, ownerID string, walletID string) (*models.Wallet, error) {
+func (repository *walletRepository) GetWallet(ctx context.Context, ownerID string, walletID string) (*Wallet, error) {
 	if ownerID == "" {
 		return nil, errors.New("owner ID is required")
 	}
@@ -89,21 +88,17 @@ func (repository *walletRepository) GetWallet(ctx context.Context, ownerID strin
 		return nil, errors.New("wallet ID is required")
 	}
 
-	queryExpression := "PK = :ownerPK AND SK = :walletSK"
-	experessionValues := map[string]any{
+	key := map[string]any{
 		":ownerPK":  utils.GetPartitionKey("USER", ownerID),
 		":walletSK": utils.GetPartitionKey("WALLET", walletID),
 	}
 
-	wallet := models.Wallet{}
+	wallet := Wallet{}
 
-	err := repository.db.QueryItems(
+	err := repository.db.GetItem(
 		ctx,
 		repository.tableName,
-		queryExpression,
-		experessionValues,
-		"",
-		"",
+		key,
 		&wallet,
 	)
 

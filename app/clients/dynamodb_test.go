@@ -92,6 +92,7 @@ func TestDynamoDBUpdateItem(t *testing.T) {
 		map[string]any{"id": "txn-1"},
 		"SET amount = :amount",
 		map[string]any{":amount": 99},
+		nil,
 		"attribute_exists(id)",
 	)
 	require.NoError(t, err)
@@ -118,6 +119,7 @@ func TestDynamoDBUpdateItemWithoutOptionalFields(t *testing.T) {
 		map[string]any{"id": "txn-2"},
 		"SET amount = amount + :increment",
 		map[string]any{},
+		nil,
 		"",
 	)
 	require.NoError(t, err)

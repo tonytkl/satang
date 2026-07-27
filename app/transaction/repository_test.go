@@ -14,7 +14,7 @@ import (
 
 type mockDynamoDB struct {
 	putItemFn                  func(ctx context.Context, table string, item any) error
-	updateItemFn               func(ctx context.Context, table string, key map[string]any, updateExpression string, expressionValues map[string]any, conditionExpression string) error
+	updateItemFn               func(ctx context.Context, table string, key map[string]any, updateExpression string, expressionValues map[string]any, expressionNames map[string]string, conditionExpression string) error
 	getItemFn                  func(ctx context.Context, table string, key map[string]any, out any) error
 	deleteItemFn               func(ctx context.Context, table string, key map[string]any) error
 	queryItemsFn               func(ctx context.Context, table string, keyConditionExpression string, expressionValues map[string]any, indexName string, filterExpression string, out any) error
@@ -31,9 +31,9 @@ func (m *mockDynamoDB) PutItem(ctx context.Context, table string, item any) erro
 	return nil
 }
 
-func (m *mockDynamoDB) UpdateItem(ctx context.Context, table string, key map[string]any, updateExpression string, expressionValues map[string]any, conditionExpression string) error {
+func (m *mockDynamoDB) UpdateItem(ctx context.Context, table string, key map[string]any, updateExpression string, expressionValues map[string]any, expressionNames map[string]string, conditionExpression string) error {
 	if m.updateItemFn != nil {
-		return m.updateItemFn(ctx, table, key, updateExpression, expressionValues, conditionExpression)
+		return m.updateItemFn(ctx, table, key, updateExpression, expressionValues, expressionNames, conditionExpression)
 	}
 	return nil
 }
@@ -235,7 +235,7 @@ func TestTransactionRepositoryUpdateSuccess(t *testing.T) {
 	image := "https://example.com/image.png"
 
 	mock := &mockDynamoDB{
-		updateItemFn: func(_ context.Context, table string, key map[string]any, updateExpression string, expressionValues map[string]any, conditionExpression string) error {
+		updateItemFn: func(_ context.Context, table string, key map[string]any, updateExpression string, expressionValues map[string]any, expressionNames map[string]string, conditionExpression string) error {
 			require.Equal(t, "transactions", table)
 			assert.Equal(t, "USER#user-1", key["PK"])
 			assert.Equal(t, "TX#2026-04-20#tx-1", key["SK"])
@@ -243,7 +243,9 @@ func TestTransactionRepositoryUpdateSuccess(t *testing.T) {
 			wantCond := "attribute_exists(PK) AND attribute_exists(SK) AND ID = :transactionID"
 			require.Equal(t, wantCond, conditionExpression)
 
-			assert.Contains(t, updateExpression, "SET WalletID = :walletID")
+			assert.Contains(t, updateExpression, "SET #WalletID = :walletID")
+			assert.Equal(t, "WalletID", expressionNames["#WalletID"])
+			assert.Equal(t, "UpdatedAt", expressionNames["#UpdatedAt"])
 
 			assert.Equal(t, "wallet-2", expressionValues[":walletID"])
 			assert.Equal(t, "TX_CATEGORY#cat-2", expressionValues[":gsiCategoryPK"])
@@ -302,7 +304,7 @@ func TestTransactionRepositoryDBErrorWrapping(t *testing.T) {
 	dbErr := errors.New("dynamodb failed")
 
 	mock := &mockDynamoDB{
-		updateItemFn: func(_ context.Context, _ string, _ map[string]any, _ string, _ map[string]any, _ string) error {
+		updateItemFn: func(_ context.Context, _ string, _ map[string]any, _ string, _ map[string]any, _ map[string]string, _ string) error {
 			return dbErr
 		},
 		deleteItemFn: func(_ context.Context, _ string, _ map[string]any) error {

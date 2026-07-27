@@ -26,7 +26,7 @@ import (
 // isolated from higher-level application code.
 type DynamoDBClient interface {
 	PutItem(ctx context.Context, table string, item any) error
-	UpdateItem(ctx context.Context, table string, key map[string]any, updateExpression string, expressionValues map[string]any, conditionExpression string) error
+	UpdateItem(ctx context.Context, table string, key map[string]any, updateExpression string, expressionValues map[string]any, expressionNames map[string]string, conditionExpression string) error
 	GetItem(ctx context.Context, table string, key map[string]any, out any) error
 	DeleteItem(ctx context.Context, table string, key map[string]any) error
 	QueryItems(ctx context.Context, table string, keyConditionExpression string, expressionValues map[string]any, indexName string, filterExpression string, out any) error
@@ -98,7 +98,7 @@ func (d *DynamoDB) PutItem(ctx context.Context, table string, item any) error {
 
 // UpdateItem updates an existing item using a DynamoDB update expression.
 // expressionValues should map placeholders like ":amount" to concrete values.
-func (d *DynamoDB) UpdateItem(ctx context.Context, table string, key map[string]any, updateExpression string, expressionValues map[string]any, conditionExpression string) error {
+func (d *DynamoDB) UpdateItem(ctx context.Context, table string, key map[string]any, updateExpression string, expressionValues map[string]any, expressionNames map[string]string, conditionExpression string) error {
 	attrKey, err := attributevalue.MarshalMap(key)
 	if err != nil {
 		return fmt.Errorf("marshal key: %w", err)
@@ -114,6 +114,8 @@ func (d *DynamoDB) UpdateItem(ctx context.Context, table string, key map[string]
 		Key:              attrKey,
 		UpdateExpression: &updateExpression,
 	}
+
+	input.ExpressionAttributeNames = expressionNames
 
 	if len(attrValues) > 0 {
 		input.ExpressionAttributeValues = attrValues

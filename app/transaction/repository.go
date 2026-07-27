@@ -196,7 +196,21 @@ func (repository *transactionRepository) Update(ctx context.Context, ownerID str
 		"SK": sortingKey,
 	}
 
-	updateExpression := "SET WalletID = :walletID, WalletName = :walletName, Amount = :amount, Currency = :currency, CategoryID = :categoryID, CategoryName = :categoryName, Description = :description, ImageURL = :imageURL, GSI_PK = :gsiCategoryPK, GSI2_PK = :gsiWalletPK, UpdatedAt = :updatedAt"
+	updateExpression := "SET #WalletID = :walletID, #WalletName = :walletName, #Amount = :amount, #Currency = :currency, #CategoryID = :categoryID, #CategoryName = :categoryName, #Description = :description, #ImageURL = :imageURL, #GSI_PK = :gsiCategoryPK, #GSI2_PK = :gsiWalletPK, #UpdatedAt = :updatedAt"
+
+	expressionNames := map[string]string{
+		"#WalletID":    "WalletID",
+		"#WalletName":  "WalletName",
+		"#Amount":      "Amount",
+		"#Currency":    "Currency",
+		"#CategoryID":  "CategoryID",
+		"#CategoryName": "CategoryName",
+		"#Description": "Description",
+		"#ImageURL":    "ImageURL",
+		"#GSI_PK":      "GSI_PK",
+		"#GSI2_PK":     "GSI2_PK",
+		"#UpdatedAt":   "UpdatedAt",
+	}
 
 	expressionValues := map[string]any{
 		":walletID":      transaction.WalletID,
@@ -215,7 +229,7 @@ func (repository *transactionRepository) Update(ctx context.Context, ownerID str
 
 	conditionExpression := "attribute_exists(PK) AND attribute_exists(SK) AND ID = :transactionID"
 
-	if err := repository.db.UpdateItem(ctx, repository.tableName, key, updateExpression, expressionValues, conditionExpression); err != nil {
+	if err := repository.db.UpdateItem(ctx, repository.tableName, key, updateExpression, expressionValues, expressionNames, conditionExpression); err != nil {
 		return fmt.Errorf("update transaction: %w", err)
 	}
 

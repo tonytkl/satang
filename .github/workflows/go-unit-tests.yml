@@ -10,10 +10,17 @@ concurrency:
   group: go-unit-tests-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+  pull-requests: write
+
 jobs:
   test:
     name: Run Go unit tests
     runs-on: ubuntu-latest
+
+    env:
+      MIN_COVERAGE: "70"
 
     defaults:
       run:
@@ -30,4 +37,46 @@ jobs:
           cache-dependency-path: app/go.sum
 
       - name: Run tests
-        run: go test ./...
+        run: go test ./... -coverprofile=coverage.out -covermode=atomic
+
+      - name: Check coverage threshold
+        id: coverage
+        run: |
+          coverage=$(go tool cover -func=coverage.out | awk '/^total:/ {gsub("%", "", $3); print $3}')
+          echo "coverage=${coverage}" >> "$GITHUB_OUTPUT"
+
+          awk -v cov="$coverage" -v min="$MIN_COVERAGE" 'BEGIN {
+            if (cov + 0 < min + 0) {
+              printf("Coverage %.2f%% is below minimum %.2f%%\n", cov + 0, min + 0)
+              exit 1
+            }
+            printf("Coverage %.2f%% meets minimum %.2f%%\n", cov + 0, min + 0)
+          }'
+
+      - name: Add coverage to job summary
+        if: always()
+        run: |
+          status="PASS"
+          if [ "${{ steps.coverage.outcome }}" != "success" ]; then
+            status="FAIL"
+          fi
+
+          {
+            echo "## Go Test Coverage"
+            echo
+            echo "- Total coverage: **${{ steps.coverage.outputs.coverage }}%**"
+            echo "- Minimum required: **${MIN_COVERAGE}%**"
+            echo "- Threshold check: **${status}**"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Comment coverage on PR
+        if: always()
+        uses: marocchino/sticky-pull-request-comment@v2
+        continue-on-error: true
+        with:
+          header: go-coverage
+          message: |
+            ## Go Test Coverage
+            - Total coverage: **${{ steps.coverage.outputs.coverage }}%**
+            - Minimum required: **${{ env.MIN_COVERAGE }}%**
+            - Threshold check: **${{ steps.coverage.outcome == 'success' && 'PASS' || 'FAIL' }}**

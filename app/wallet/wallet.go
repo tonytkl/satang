@@ -36,3 +36,35 @@ func NewWallet(id, ownerID, name, currency string) *Wallet {
 		UpdatedAt: now,
 	}
 }
+
+func (wallet *Wallet) GetID() string {
+	return wallet.ID
+}
+
+func (wallet *Wallet) SetPK(pk string) {
+	wallet.PK = pk
+}
+
+func (wallet *Wallet) SetSK(sk string) {
+	wallet.SK = sk
+}
+
+func (wallet *Wallet) GetCreatedAt() time.Time {
+	return wallet.CreatedAt
+}
+
+func (wallet *Wallet) SetCreatedAt(createdAt time.Time) {
+	wallet.CreatedAt = createdAt
+}
+
+func (wallet *Wallet) GetUpdatedAt() time.Time {
+	return wallet.UpdatedAt
+}
+
+func (wallet *Wallet) SetUpdatedAt(updatedAt time.Time) {
+	wallet.UpdatedAt = updatedAt
+}
+
+func (wallet *Wallet) GetOwnerID() string {
+	return wallet.OwnerID
+}

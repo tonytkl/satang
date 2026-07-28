@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 	"sort"
 	"strings"
 	"time"
@@ -11,13 +12,9 @@ import (
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	"github.com/tonytkl/satang/clients"
 	"github.com/tonytkl/satang/utils"
-	"github.com/tonytkl/satang/wallet"
 )
 
 type SatangModel interface {
-	// Models
-	*wallet.Wallet
-
 	// Model functions: Only shared functions with all models
 	GetID() string
 	SetPK(string)
@@ -74,13 +71,29 @@ func (repository *baseRepository[T]) Save(ctx context.Context, item T) error {
 	return nil
 }
 
-func (repository *baseRepository[T]) Get(ctx context.Context, ownerID, itemID string) (T, error) {
+func isNilModel[T any](item T) bool {
+	if any(item) == nil {
+		return true
+	}
+
+	value := reflect.ValueOf(item)
+	switch value.Kind() {
+	case reflect.Ptr, reflect.Interface, reflect.Map, reflect.Slice, reflect.Func, reflect.Chan:
+		return value.IsNil()
+	default:
+		return false
+	}
+}
+
+func (repository *baseRepository[T]) Get(ctx context.Context, ownerID string, itemID string) (T, error) {
+	var zero T
+
 	if ownerID == "" {
-		return nil, errors.New("owner ID is required")
+		return zero, errors.New("owner ID is required")
 	}
 
 	if itemID == "" {
-		return nil, errors.New("item ID is required")
+		return zero, errors.New("item ID is required")
 	}
 
 	key := map[string]any{
@@ -94,17 +107,17 @@ func (repository *baseRepository[T]) Get(ctx context.Context, ownerID, itemID st
 		ctx,
 		repository.tableName,
 		key,
-		*item,
+		item,
 	)
 
 	if err != nil {
-		return nil, fmt.Errorf("Error on Get: %w", err)
+		return zero, fmt.Errorf("Error on Get: %w", err)
 	}
 
 	return item, nil
 }
 
-func (repository *baseRepository[T]) List(ctx context.Context, ownerID, nextToken string, limit int32) ([]T, string, error) {
+func (repository *baseRepository[T]) List(ctx context.Context, ownerID string, nextToken string, limit int32) ([]T, string, error) {
 	if ownerID == "" {
 		return nil, "", errors.New("owner ID is required")
 	}
@@ -143,7 +156,7 @@ func (repository *baseRepository[T]) Update(ctx context.Context, ownerID string,
 		return errors.New("item ID is required")
 	}
 
-	if item == nil {
+	if isNilModel(item) {
 		return errors.New("Update payload is required")
 	}
 

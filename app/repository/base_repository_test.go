@@ -9,8 +9,49 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/tonytkl/satang/clients"
-	"github.com/tonytkl/satang/wallet"
 )
+
+type testModel struct {
+	PK        string
+	SK        string
+	ID        string
+	OwnerID   string
+	Name      string
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
+func (model *testModel) GetID() string {
+	return model.ID
+}
+
+func (model *testModel) SetPK(pk string) {
+	model.PK = pk
+}
+
+func (model *testModel) SetSK(sk string) {
+	model.SK = sk
+}
+
+func (model *testModel) GetCreatedAt() time.Time {
+	return model.CreatedAt
+}
+
+func (model *testModel) SetCreatedAt(createdAt time.Time) {
+	model.CreatedAt = createdAt
+}
+
+func (model *testModel) GetUpdatedAt() time.Time {
+	return model.UpdatedAt
+}
+
+func (model *testModel) SetUpdatedAt(updatedAt time.Time) {
+	model.UpdatedAt = updatedAt
+}
+
+func (model *testModel) GetOwnerID() string {
+	return model.OwnerID
+}
 
 // mockDynamoDB is a test double for clients.DynamoDBClient.
 type mockDynamoDB struct {
@@ -74,9 +115,9 @@ func (m *mockDynamoDB) ScanItems(ctx context.Context, table string, filterExpres
 	return nil
 }
 
-// newWalletRepo creates a BaseRepository[*wallet.Wallet] backed by the given mock.
-func newWalletRepo(db clients.DynamoDBClient) BaseRepository[*wallet.Wallet] {
-	return NewBaseRepository(db, "wallets", "WALLET", func() *wallet.Wallet { return &wallet.Wallet{} })
+// newTestRepo creates a BaseRepository[*testModel] backed by the given mock.
+func newTestRepo(db clients.DynamoDBClient) BaseRepository[*testModel] {
+	return NewBaseRepository(db, "wallets", "WALLET", func() *testModel { return &testModel{} })
 }
 
 // ---------------------------------------------------------------------------
@@ -88,7 +129,7 @@ func TestBaseRepositorySave_SetsKeysAndTimestamps(t *testing.T) {
 		putItemFn: func(_ context.Context, table string, item any) error {
 			require.Equal(t, "wallets", table)
 
-			w, ok := item.(*wallet.Wallet)
+			w, ok := item.(*testModel)
 			require.True(t, ok)
 
 			assert.Equal(t, "USER#owner-1", w.PK)
@@ -99,8 +140,8 @@ func TestBaseRepositorySave_SetsKeysAndTimestamps(t *testing.T) {
 		},
 	}
 
-	repo := newWalletRepo(db)
-	w := &wallet.Wallet{ID: "wallet-1", OwnerID: "owner-1", Name: "Cash", Currency: "THB"}
+	repo := newTestRepo(db)
+	w := &testModel{ID: "wallet-1", OwnerID: "owner-1", Name: "Cash"}
 
 	err := repo.Save(context.Background(), w)
 	require.NoError(t, err)
@@ -112,15 +153,15 @@ func TestBaseRepositorySave_PreservesExistingTimestamps(t *testing.T) {
 
 	db := &mockDynamoDB{
 		putItemFn: func(_ context.Context, _ string, item any) error {
-			w := item.(*wallet.Wallet)
+			w := item.(*testModel)
 			assert.Equal(t, createdAt, w.CreatedAt)
 			assert.Equal(t, updatedAt, w.UpdatedAt)
 			return nil
 		},
 	}
 
-	repo := newWalletRepo(db)
-	w := &wallet.Wallet{ID: "wallet-1", OwnerID: "owner-1", CreatedAt: createdAt, UpdatedAt: updatedAt}
+	repo := newTestRepo(db)
+	w := &testModel{ID: "wallet-1", OwnerID: "owner-1", CreatedAt: createdAt, UpdatedAt: updatedAt}
 
 	err := repo.Save(context.Background(), w)
 	require.NoError(t, err)
@@ -133,8 +174,8 @@ func TestBaseRepositorySave_PropagatesDynamoDBError(t *testing.T) {
 		},
 	}
 
-	repo := newWalletRepo(db)
-	w := &wallet.Wallet{ID: "wallet-1", OwnerID: "owner-1"}
+	repo := newTestRepo(db)
+	w := &testModel{ID: "wallet-1", OwnerID: "owner-1"}
 
 	err := repo.Save(context.Background(), w)
 	require.EqualError(t, err, "dynamodb unavailable")
@@ -151,7 +192,7 @@ func TestBaseRepositoryGet_Success(t *testing.T) {
 			assert.Equal(t, "USER#owner-1", key["PK"])
 			assert.Equal(t, "WALLET#wallet-1", key["SK"])
 
-			w, ok := out.(wallet.Wallet)
+			w, ok := out.(*testModel)
 			require.True(t, ok)
 			w.ID = "wallet-1"
 			w.OwnerID = "owner-1"
@@ -160,7 +201,7 @@ func TestBaseRepositoryGet_Success(t *testing.T) {
 		},
 	}
 
-	repo := newWalletRepo(db)
+	repo := newTestRepo(db)
 
 	got, err := repo.Get(context.Background(), "owner-1", "wallet-1")
 	require.NoError(t, err)
@@ -168,14 +209,14 @@ func TestBaseRepositoryGet_Success(t *testing.T) {
 }
 
 func TestBaseRepositoryGet_EmptyOwnerIDReturnsError(t *testing.T) {
-	repo := newWalletRepo(&mockDynamoDB{})
+	repo := newTestRepo(&mockDynamoDB{})
 
 	_, err := repo.Get(context.Background(), "", "wallet-1")
 	require.EqualError(t, err, "owner ID is required")
 }
 
 func TestBaseRepositoryGet_EmptyItemIDReturnsError(t *testing.T) {
-	repo := newWalletRepo(&mockDynamoDB{})
+	repo := newTestRepo(&mockDynamoDB{})
 
 	_, err := repo.Get(context.Background(), "owner-1", "")
 	require.EqualError(t, err, "item ID is required")
@@ -188,7 +229,7 @@ func TestBaseRepositoryGet_PropagatesDynamoDBError(t *testing.T) {
 		},
 	}
 
-	repo := newWalletRepo(db)
+	repo := newTestRepo(db)
 
 	_, err := repo.Get(context.Background(), "owner-1", "wallet-1")
 	require.Error(t, err)
@@ -210,9 +251,9 @@ func TestBaseRepositoryList_Success(t *testing.T) {
 			assert.Equal(t, int32(10), limit)
 			assert.Equal(t, "", nextToken)
 
-			dest, ok := out.(*[]*wallet.Wallet)
+			dest, ok := out.(*[]*testModel)
 			require.True(t, ok)
-			*dest = []*wallet.Wallet{
+			*dest = []*testModel{
 				{ID: "wallet-1"},
 				{ID: "wallet-2"},
 			}
@@ -220,7 +261,7 @@ func TestBaseRepositoryList_Success(t *testing.T) {
 		},
 	}
 
-	repo := newWalletRepo(db)
+	repo := newTestRepo(db)
 
 	items, token, err := repo.List(context.Background(), "owner-1", "", 10)
 	require.NoError(t, err)
@@ -231,7 +272,7 @@ func TestBaseRepositoryList_Success(t *testing.T) {
 }
 
 func TestBaseRepositoryList_EmptyOwnerIDReturnsError(t *testing.T) {
-	repo := newWalletRepo(&mockDynamoDB{})
+	repo := newTestRepo(&mockDynamoDB{})
 
 	_, _, err := repo.List(context.Background(), "", "", 10)
 	require.EqualError(t, err, "owner ID is required")
@@ -244,7 +285,7 @@ func TestBaseRepositoryList_PropagatesDynamoDBError(t *testing.T) {
 		},
 	}
 
-	repo := newWalletRepo(db)
+	repo := newTestRepo(db)
 
 	_, _, err := repo.List(context.Background(), "owner-1", "", 10)
 	require.Error(t, err)
@@ -269,8 +310,8 @@ func TestBaseRepositoryUpdate_Success(t *testing.T) {
 		},
 	}
 
-	repo := newWalletRepo(db)
-	w := &wallet.Wallet{
+	repo := newTestRepo(db)
+	w := &testModel{
 		ID:      "wallet-1",
 		OwnerID: "owner-1",
 		Name:    "Updated Name",
@@ -281,23 +322,23 @@ func TestBaseRepositoryUpdate_Success(t *testing.T) {
 }
 
 func TestBaseRepositoryUpdate_EmptyOwnerIDReturnsError(t *testing.T) {
-	repo := newWalletRepo(&mockDynamoDB{})
-	w := &wallet.Wallet{ID: "wallet-1", OwnerID: "owner-1"}
+	repo := newTestRepo(&mockDynamoDB{})
+	w := &testModel{ID: "wallet-1", OwnerID: "owner-1"}
 
 	err := repo.Update(context.Background(), "", "wallet-1", w)
 	require.EqualError(t, err, "owner ID is required")
 }
 
 func TestBaseRepositoryUpdate_EmptyItemIDReturnsError(t *testing.T) {
-	repo := newWalletRepo(&mockDynamoDB{})
-	w := &wallet.Wallet{ID: "wallet-1", OwnerID: "owner-1"}
+	repo := newTestRepo(&mockDynamoDB{})
+	w := &testModel{ID: "wallet-1", OwnerID: "owner-1"}
 
 	err := repo.Update(context.Background(), "owner-1", "", w)
 	require.EqualError(t, err, "item ID is required")
 }
 
 func TestBaseRepositoryUpdate_NilItemReturnsError(t *testing.T) {
-	repo := newWalletRepo(&mockDynamoDB{})
+	repo := newTestRepo(&mockDynamoDB{})
 
 	err := repo.Update(context.Background(), "owner-1", "wallet-1", nil)
 	require.EqualError(t, err, "Update payload is required")
@@ -310,8 +351,8 @@ func TestBaseRepositoryUpdate_PropagatesDynamoDBError(t *testing.T) {
 		},
 	}
 
-	repo := newWalletRepo(db)
-	w := &wallet.Wallet{ID: "wallet-1", OwnerID: "owner-1", Name: "Cash"}
+	repo := newTestRepo(db)
+	w := &testModel{ID: "wallet-1", OwnerID: "owner-1", Name: "Cash"}
 
 	err := repo.Update(context.Background(), "owner-1", "wallet-1", w)
 	require.Error(t, err)
@@ -333,21 +374,21 @@ func TestBaseRepositoryDelete_Success(t *testing.T) {
 		},
 	}
 
-	repo := newWalletRepo(db)
+	repo := newTestRepo(db)
 
 	err := repo.Delete(context.Background(), "owner-1", "wallet-1")
 	require.NoError(t, err)
 }
 
 func TestBaseRepositoryDelete_EmptyOwnerIDReturnsError(t *testing.T) {
-	repo := newWalletRepo(&mockDynamoDB{})
+	repo := newTestRepo(&mockDynamoDB{})
 
 	err := repo.Delete(context.Background(), "", "wallet-1")
 	require.EqualError(t, err, "owner ID is required")
 }
 
 func TestBaseRepositoryDelete_EmptyItemIDReturnsError(t *testing.T) {
-	repo := newWalletRepo(&mockDynamoDB{})
+	repo := newTestRepo(&mockDynamoDB{})
 
 	err := repo.Delete(context.Background(), "owner-1", "")
 	require.EqualError(t, err, "item ID is required")
@@ -360,7 +401,7 @@ func TestBaseRepositoryDelete_PropagatesDynamoDBError(t *testing.T) {
 		},
 	}
 
-	repo := newWalletRepo(db)
+	repo := newTestRepo(db)
 
 	err := repo.Delete(context.Background(), "owner-1", "wallet-1")
 	require.Error(t, err)

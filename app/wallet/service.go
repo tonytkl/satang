@@ -94,15 +94,15 @@ func (service *service) GetWallet(ctx context.Context, ownerID string, walletID 
 }
 
 func (service *service) EditWallet(ctx context.Context, ownerID string, walletID string, changedFields map[string]any) error {
-	if changedFields["OwnerID"] != nil {
+	if _, ok := changedFields["OwnerID"]; ok {
 		return errors.New("Owner ID is not updateable")
 	}
 
-	if changedFields["Currency"] != nil {
+	if _, ok := changedFields["Currency"]; ok {
 		return errors.New("Currency is not updateable")
 	}
 
-	if changedFields["Balance"] != nil {
+	if _, ok := changedFields["Balance"]; ok {
 		return errors.New("Balance is not updateable")
 	}
 	return service.repository.EditWallet(ctx, ownerID, walletID, changedFields)

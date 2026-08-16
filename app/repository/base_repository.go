@@ -4,12 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"reflect"
 	"sort"
 	"strings"
 	"time"
 
-	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	"github.com/tonytkl/satang/clients"
 	"github.com/tonytkl/satang/utils"
 )
@@ -30,7 +28,7 @@ type BaseRepository[T SatangModel] interface {
 	Save(ctx context.Context, item T) error
 	Get(ctx context.Context, ownerID string, itemID string) (T, error)
 	List(ctx context.Context, ownerID string, nextToken string, limit int32) ([]T, string, error)
-	Update(ctx context.Context, ownerID string, itemID string, item T) error
+	Update(ctx context.Context, ownerID string, itemID string, changedFields map[string]any) error
 	Delete(ctx context.Context, ownerID string, itemID string) error
 }
 
@@ -69,20 +67,6 @@ func (repository *baseRepository[T]) Save(ctx context.Context, item T) error {
 	}
 
 	return nil
-}
-
-func isNilModel[T any](item T) bool {
-	if any(item) == nil {
-		return true
-	}
-
-	value := reflect.ValueOf(item)
-	switch value.Kind() {
-	case reflect.Ptr, reflect.Interface, reflect.Map, reflect.Slice, reflect.Func, reflect.Chan:
-		return value.IsNil()
-	default:
-		return false
-	}
 }
 
 func (repository *baseRepository[T]) Get(ctx context.Context, ownerID string, itemID string) (T, error) {
@@ -147,7 +131,7 @@ func (repository *baseRepository[T]) List(ctx context.Context, ownerID string, n
 	return items, encodedNextToken, nil
 }
 
-func (repository *baseRepository[T]) Update(ctx context.Context, ownerID string, itemID string, item T) error {
+func (repository *baseRepository[T]) Update(ctx context.Context, ownerID string, itemID string, changedFields map[string]any) error {
 	if ownerID == "" {
 		return errors.New("owner ID is required")
 	}
@@ -156,7 +140,7 @@ func (repository *baseRepository[T]) Update(ctx context.Context, ownerID string,
 		return errors.New("item ID is required")
 	}
 
-	if isNilModel(item) {
+	if len(changedFields) == 0 {
 		return errors.New("Update payload is required")
 	}
 
@@ -165,10 +149,11 @@ func (repository *baseRepository[T]) Update(ctx context.Context, ownerID string,
 		"SK": utils.GetPartitionKey(repository.skModel, itemID),
 	}
 
-	raw, err := attributevalue.MarshalMap(item)
-	if err != nil {
-		return fmt.Errorf("Error marshaling while updateing: %w", err)
+	raw := make(map[string]any, len(changedFields)+1)
+	for key, value := range changedFields {
+		raw[key] = value
 	}
+	raw["UpdatedAt"] = time.Now().UTC()
 
 	delete(raw, "PK")
 	delete(raw, "SK")
@@ -196,12 +181,7 @@ func (repository *baseRepository[T]) Update(ctx context.Context, ownerID string,
 		valueField := fmt.Sprintf(":v%d", index)
 		setParts = append(setParts, nameField+" = "+valueField)
 		exprNames[nameField] = attr
-
-		var v any
-		if err := attributevalue.Unmarshal(raw[attr], &v); err != nil {
-			return fmt.Errorf("Unmarshal error field %s: %w", attr, err)
-		}
-		exprValues[valueField] = v
+		exprValues[valueField] = raw[attr]
 	}
 	updateExpression := "SET " + strings.Join(setParts, ",")
 	conditionExpression := "attribute_exists(PK) AND attribute_exists(SK) AND ID = :id"

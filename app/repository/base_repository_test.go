@@ -311,29 +311,27 @@ func TestBaseRepositoryUpdate_Success(t *testing.T) {
 	}
 
 	repo := newTestRepo(db)
-	w := &testModel{
-		ID:      "wallet-1",
-		OwnerID: "owner-1",
-		Name:    "Updated Name",
+	changedFields := map[string]any{
+		"Name": "Updated Name",
 	}
 
-	err := repo.Update(context.Background(), "owner-1", "wallet-1", w)
+	err := repo.Update(context.Background(), "owner-1", "wallet-1", changedFields)
 	require.NoError(t, err)
 }
 
 func TestBaseRepositoryUpdate_EmptyOwnerIDReturnsError(t *testing.T) {
 	repo := newTestRepo(&mockDynamoDB{})
-	w := &testModel{ID: "wallet-1", OwnerID: "owner-1"}
+	changedFields := map[string]any{"Name": "Updated Name"}
 
-	err := repo.Update(context.Background(), "", "wallet-1", w)
+	err := repo.Update(context.Background(), "", "wallet-1", changedFields)
 	require.EqualError(t, err, "owner ID is required")
 }
 
 func TestBaseRepositoryUpdate_EmptyItemIDReturnsError(t *testing.T) {
 	repo := newTestRepo(&mockDynamoDB{})
-	w := &testModel{ID: "wallet-1", OwnerID: "owner-1"}
+	changedFields := map[string]any{"Name": "Updated Name"}
 
-	err := repo.Update(context.Background(), "owner-1", "", w)
+	err := repo.Update(context.Background(), "owner-1", "", changedFields)
 	require.EqualError(t, err, "item ID is required")
 }
 
@@ -341,6 +339,13 @@ func TestBaseRepositoryUpdate_NilItemReturnsError(t *testing.T) {
 	repo := newTestRepo(&mockDynamoDB{})
 
 	err := repo.Update(context.Background(), "owner-1", "wallet-1", nil)
+	require.EqualError(t, err, "Update payload is required")
+}
+
+func TestBaseRepositoryUpdate_EmptyPayloadReturnsError(t *testing.T) {
+	repo := newTestRepo(&mockDynamoDB{})
+
+	err := repo.Update(context.Background(), "owner-1", "wallet-1", map[string]any{})
 	require.EqualError(t, err, "Update payload is required")
 }
 
@@ -352,9 +357,9 @@ func TestBaseRepositoryUpdate_PropagatesDynamoDBError(t *testing.T) {
 	}
 
 	repo := newTestRepo(db)
-	w := &testModel{ID: "wallet-1", OwnerID: "owner-1", Name: "Cash"}
+	changedFields := map[string]any{"Name": "Cash"}
 
-	err := repo.Update(context.Background(), "owner-1", "wallet-1", w)
+	err := repo.Update(context.Background(), "owner-1", "wallet-1", changedFields)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "update item")
 	assert.Contains(t, err.Error(), "conditional check failed")

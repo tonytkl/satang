@@ -2,6 +2,14 @@ package wallet
 
 import "time"
 
+type WalletType string
+
+const (
+	WalletTypeDebit      WalletType = "DEBIT"
+	WalletTypeCredit     WalletType = "CREDIT"
+	WalletTypeInvestment WalletType = "INVESTMENT"
+)
+
 // Wallet represents a wallet holding a currency balance.
 // The wallet lives in its own partition to support multiple members.
 // DynamoDB keys:
@@ -11,18 +19,20 @@ import "time"
 //
 // Membership is modelled separately via WalletMember (adjacency list pattern).
 type Wallet struct {
-	PK        string    `dynamodbav:"PK"`
-	SK        string    `dynamodbav:"SK"`
-	ID        string    `dynamodbav:"ID"`
-	OwnerID   string    `dynamodbav:"OwnerID"`
-	Name      string    `dynamodbav:"Name"`
-	Currency  string    `dynamodbav:"Currency"`
-	Balance   float64   `dynamodbav:"Balance"`
-	CreatedAt time.Time `dynamodbav:"CreatedAt"`
-	UpdatedAt time.Time `dynamodbav:"UpdatedAt"`
+	PK        string     `dynamodbav:"PK"`
+	SK        string     `dynamodbav:"SK"`
+	ID        string     `dynamodbav:"ID"`
+	OwnerID   string     `dynamodbav:"OwnerID"`
+	Name      string     `dynamodbav:"Name"`
+	Currency  string     `dynamodbav:"Currency"`
+	Balance   float64    `dynamodbav:"Balance"`
+	Type      WalletType `dynamodbav:"Type"`
+	IsActive  bool       `dynamodbav:"IsActive"`
+	CreatedAt time.Time  `dynamodbav:"CreatedAt"`
+	UpdatedAt time.Time  `dynamodbav:"UpdatedAt"`
 }
 
-func NewWallet(id, ownerID, name, currency string) *Wallet {
+func NewWallet(id string, ownerID string, name string, currency string, walletType WalletType) *Wallet {
 	now := time.Now().UTC()
 	return &Wallet{
 		PK:        "USER#" + ownerID,
@@ -32,6 +42,8 @@ func NewWallet(id, ownerID, name, currency string) *Wallet {
 		Name:      name,
 		Currency:  currency,
 		Balance:   0,
+		Type:      walletType,
+		IsActive:  true,
 		CreatedAt: now,
 		UpdatedAt: now,
 	}

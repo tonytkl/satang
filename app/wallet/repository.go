@@ -11,6 +11,8 @@ type WalletRepository interface {
 	CreateWallet(ctx context.Context, wallet *Wallet) error
 	GetWalletList(ctx context.Context, ownerID string, nextToken string, limit int32) ([]*Wallet, string, error)
 	GetWallet(ctx context.Context, ownerID string, walletID string) (*Wallet, error)
+	EditWallet(ctx context.Context, ownerID string, walletID string, changedFields map[string]any) error
+	DeleteWallet(ctx context.Context, ownerID string, walletID string) error
 }
 
 type walletRepository struct {
@@ -37,4 +39,12 @@ func (walletRepository *walletRepository) GetWalletList(ctx context.Context, own
 
 func (walletRepository *walletRepository) GetWallet(ctx context.Context, ownerID string, walletID string) (*Wallet, error) {
 	return walletRepository.baseRepository.Get(ctx, ownerID, walletID)
+}
+
+func (walletRepository *walletRepository) EditWallet(ctx context.Context, ownerID string, walletID string, changedFields map[string]any) error {
+	return walletRepository.baseRepository.Update(ctx, ownerID, walletID, changedFields)
+}
+
+func (walletRepository *walletRepository) DeleteWallet(ctx context.Context, ownerID string, walletID string) error {
+	return walletRepository.baseRepository.Delete(ctx, ownerID, walletID)
 }

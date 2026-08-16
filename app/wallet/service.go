@@ -50,6 +50,10 @@ func (service *service) CreateWallet(ctx context.Context, ownerID string, name s
 	)
 	wallet.Balance = balance
 
+	if err := service.repository.CreateWallet(ctx, wallet); err != nil {
+		return err
+	}
+
 	if balance != 0 {
 		if err := service.transactionService.CreateTransaction(
 			ctx,
@@ -66,12 +70,12 @@ func (service *service) CreateWallet(ctx context.Context, ownerID string, name s
 			time.Now().UTC(),
 			wallet.OwnerID,
 		); err != nil {
+			_ = service.repository.DeleteWallet(ctx, ownerID, wallet.ID)
 			return err
 		}
 	}
 
-	return service.repository.CreateWallet(ctx, wallet)
-}
+	return nil
 
 func (service *service) GetWalletList(ctx context.Context, ownerID string, nextToken string, limit int32) ([]*Wallet, string, error) {
 	if limit == 0 {

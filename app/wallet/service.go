@@ -124,17 +124,14 @@ func (service *service) SetActiveWallet(ctx context.Context, ownerID string, wal
 // }
 
 func getTransactionType(strWalletType string) (WalletType, error) {
-	if strings.ToLower(strWalletType) == "debit" {
+	switch strings.ToLower(strings.TrimSpace(strWalletType)) {
+	case "debit":
 		return WalletTypeDebit, nil
-	}
-
-	if strings.ToLower(strWalletType) == "credit" {
+	case "credit":
 		return WalletTypeCredit, nil
-	}
-
-	if strings.ToLower(strWalletType) == "investment" {
+	case "investment":
 		return WalletTypeInvestment, nil
+	default:
+		return "", errors.New("invalid wallet type")
 	}
-
-	return "", errors.New("Invalid transaction type")
 }

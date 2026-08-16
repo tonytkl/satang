@@ -76,6 +76,7 @@ func (service *service) CreateWallet(ctx context.Context, ownerID string, name s
 	}
 
 	return nil
+}
 
 func (service *service) GetWalletList(ctx context.Context, ownerID string, nextToken string, limit int32) ([]*Wallet, string, error) {
 	if limit == 0 {
@@ -132,6 +133,6 @@ func getTransactionType(strWalletType string) (WalletType, error) {
 	case "investment":
 		return WalletTypeInvestment, nil
 	default:
-		return "", errors.New("invalid wallet type")
+		return "", errors.New("Invalid transaction type")
 	}
 }

@@ -21,7 +21,6 @@ type Category struct {
 	ID        string       `dynamodbav:"ID"`
 	OwnerID   string       `dynamodbav:"OwnerID"`
 	Name      string       `dynamodbav:"Name"`
-	Currency  string       `dynamodbav:"Currency"`
 	Type      CategoryType `dynamodbav:"Type"`
 	IsActive  bool         `dynamodbav:"IsActive"`
 	CreatedAt time.Time    `dynamodbav:"CreatedAt"`

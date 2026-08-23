@@ -27,6 +27,10 @@ func NewService(repository CategoryRepository) Service {
 }
 
 func (service *service) CreateCategory(ctx context.Context, ownerID string, name string, strCategoryType string) error {
+	if ownerID == "" {
+		return errors.New("owner ID is required")
+	}
+
 	categoryID := utils.GetUUID()
 	categoryType, err := getCategoryType(strCategoryType)
 	if err != nil {
@@ -47,6 +51,9 @@ func (service *service) CreateCategory(ctx context.Context, ownerID string, name
 }
 
 func (service *service) GetCategoryList(ctx context.Context, ownerID string, nextToken string, limit int32) ([]*Category, string, error) {
+	if limit < 0 {
+		return nil, "", errors.New("limit must be greater than or equal to 0")
+	}
 	if limit == 0 {
 		limit = utils.DEFAULT_PAGINATION_SIZE
 	}
@@ -69,6 +76,19 @@ func (service *service) GetCategory(ctx context.Context, ownerID string, categor
 func (service *service) EditCategory(ctx context.Context, ownerID string, categoryID string, changedFields map[string]any) error {
 	if _, ok := changedFields["OwnerID"]; ok {
 		return errors.New("Owner ID is not updateable")
+	}
+
+	if typeValue, ok := changedFields["Type"]; ok {
+		strCategoryType, ok := typeValue.(string)
+		if !ok {
+			return errors.New("Type must be a string")
+		}
+
+		categoryType, err := getCategoryType(strCategoryType)
+		if err != nil {
+			return err
+		}
+		changedFields["Type"] = categoryType
 	}
 
 	return service.repository.EditCategory(ctx, ownerID, categoryID, changedFields)

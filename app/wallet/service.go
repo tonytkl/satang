@@ -37,7 +37,7 @@ func (service *service) CreateWallet(ctx context.Context, ownerID string, name s
 		currency = defaultCurrency
 	}
 	walletID := utils.GetUUID()
-	walletType, err := getTransactionType(strWalletType)
+	walletType, err := getWalletType(strWalletType)
 	if err != nil {
 		return err
 	}
@@ -124,7 +124,7 @@ func (service *service) SetActiveWallet(ctx context.Context, ownerID string, wal
 
 // }
 
-func getTransactionType(strWalletType string) (WalletType, error) {
+func getWalletType(strWalletType string) (WalletType, error) {
 	switch strings.ToLower(strings.TrimSpace(strWalletType)) {
 	case "debit":
 		return WalletTypeDebit, nil

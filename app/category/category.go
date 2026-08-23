@@ -10,7 +10,7 @@ const (
 	CategoryTypeTransfer CategoryType = "TRANSFER"
 )
 
-// Category represents a category that transaction occurred in.
+// Category represents a category in which a transaction occurred.
 // DynamoDB keys:
 //
 //	PK = "USER#<OwnerID>"

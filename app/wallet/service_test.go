@@ -118,6 +118,40 @@ func TestCreateWalletInvalidTypeReturnsError(t *testing.T) {
 	assert.Contains(t, err.Error(), "Invalid transaction type")
 }
 
+func TestCreateWalletRejectsEmptyOwnerID(t *testing.T) {
+	repoCalled := false
+	repo := &mockWalletRepository{
+		createWalletFn: func(ctx context.Context, wallet *Wallet) error {
+			repoCalled = true
+			return nil
+		},
+	}
+
+	service := NewService(repo, &mockTransactionService{})
+	err := service.CreateWallet(context.Background(), "", "Primary Wallet", "USD", 50.0, "debit")
+
+	require.Error(t, err)
+	assert.Equal(t, "owner ID is required", err.Error())
+	assert.False(t, repoCalled)
+}
+
+func TestGetWalletListRejectsNegativeLimit(t *testing.T) {
+	repoCalled := false
+	repo := &mockWalletRepository{
+		getWalletListFn: func(ctx context.Context, ownerID string, nextToken string, limit int32) ([]*Wallet, string, error) {
+			repoCalled = true
+			return []*Wallet{}, "", nil
+		},
+	}
+
+	service := NewService(repo, &mockTransactionService{})
+	_, _, err := service.GetWalletList(context.Background(), "user-1", "", -1)
+
+	require.Error(t, err)
+	assert.Equal(t, "limit must be greater than or equal to 0", err.Error())
+	assert.False(t, repoCalled)
+}
+
 func TestEditWalletRejectsProtectedFields(t *testing.T) {
 	tests := []struct {
 		name          string
@@ -184,6 +218,45 @@ func TestEditWalletDelegatesToRepository(t *testing.T) {
 	svc := &service{repository: repo}
 	err := svc.EditWallet(context.Background(), "user-1", "wallet-1", changedFields)
 	require.NoError(t, err)
+}
+
+func TestEditWalletConvertsTypeBeforeRepository(t *testing.T) {
+	changedFields := map[string]any{
+		"Type": "credit",
+	}
+
+	repo := &mockWalletRepository{
+		editWalletFn: func(ctx context.Context, ownerID string, walletID string, fields map[string]any) error {
+			assert.Equal(t, "user-1", ownerID)
+			assert.Equal(t, "wallet-1", walletID)
+
+			typeValue, ok := fields["Type"]
+			require.True(t, ok)
+			assert.Equal(t, WalletTypeCredit, typeValue)
+			return nil
+		},
+	}
+
+	svc := &service{repository: repo}
+	err := svc.EditWallet(context.Background(), "user-1", "wallet-1", changedFields)
+	require.NoError(t, err)
+}
+
+func TestEditWalletRejectsNonStringType(t *testing.T) {
+	repositoryCalled := false
+	repo := &mockWalletRepository{
+		editWalletFn: func(ctx context.Context, ownerID string, walletID string, changedFields map[string]any) error {
+			repositoryCalled = true
+			return nil
+		},
+	}
+
+	svc := &service{repository: repo}
+	err := svc.EditWallet(context.Background(), "user-1", "wallet-1", map[string]any{"Type": 123})
+
+	require.Error(t, err)
+	assert.Equal(t, "Type must be a string", err.Error())
+	assert.False(t, repositoryCalled)
 }
 
 func TestEditWalletReturnsRepositoryError(t *testing.T) {

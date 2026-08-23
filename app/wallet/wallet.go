@@ -11,13 +11,10 @@ const (
 )
 
 // Wallet represents a wallet holding a currency balance.
-// The wallet lives in its own partition to support multiple members.
 // DynamoDB keys:
 //
 //	PK = "USER#<OwnerID>"
 //	SK = "WALLET#<ID>"
-//
-// Membership is modelled separately via WalletMember (adjacency list pattern).
 type Wallet struct {
 	PK        string     `dynamodbav:"PK"`
 	SK        string     `dynamodbav:"SK"`

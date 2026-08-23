@@ -31,13 +31,17 @@ func NewService(repository WalletRepository, transactionService transaction.Tran
 }
 
 func (service *service) CreateWallet(ctx context.Context, ownerID string, name string, currency string, balance float64, strWalletType string) error {
+	if ownerID == "" {
+		return errors.New("owner ID is required")
+	}
+
 	// TODO: Implement currency query from user model
 	const defaultCurrency = "THB"
 	if currency == "" {
 		currency = defaultCurrency
 	}
 	walletID := utils.GetUUID()
-	walletType, err := getTransactionType(strWalletType)
+	walletType, err := getWalletType(strWalletType)
 	if err != nil {
 		return err
 	}
@@ -79,6 +83,9 @@ func (service *service) CreateWallet(ctx context.Context, ownerID string, name s
 }
 
 func (service *service) GetWalletList(ctx context.Context, ownerID string, nextToken string, limit int32) ([]*Wallet, string, error) {
+	if limit < 0 {
+		return nil, "", errors.New("limit must be greater than or equal to 0")
+	}
 	if limit == 0 {
 		limit = utils.DEFAULT_PAGINATION_SIZE
 	}
@@ -110,6 +117,20 @@ func (service *service) EditWallet(ctx context.Context, ownerID string, walletID
 	if _, ok := changedFields["Balance"]; ok {
 		return errors.New("Balance is not updateable")
 	}
+
+	if typeValue, ok := changedFields["Type"]; ok {
+		strCategoryType, ok := typeValue.(string)
+		if !ok {
+			return errors.New("Type must be a string")
+		}
+
+		categoryType, err := getWalletType(strCategoryType)
+		if err != nil {
+			return err
+		}
+		changedFields["Type"] = categoryType
+	}
+
 	return service.repository.EditWallet(ctx, ownerID, walletID, changedFields)
 }
 
@@ -124,7 +145,7 @@ func (service *service) SetActiveWallet(ctx context.Context, ownerID string, wal
 
 // }
 
-func getTransactionType(strWalletType string) (WalletType, error) {
+func getWalletType(strWalletType string) (WalletType, error) {
 	switch strings.ToLower(strings.TrimSpace(strWalletType)) {
 	case "debit":
 		return WalletTypeDebit, nil

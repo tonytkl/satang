@@ -12,7 +12,7 @@ import (
 
 type Service interface {
 	CreateWallet(ctx context.Context, ownerID string, name string, currency string, balance float64, strWalletType string) error
-	GetWalletList(ctx context.Context, ownerID string, nextToken string, limit int32) ([]*Wallet, string, error)
+	ListWallets(ctx context.Context, ownerID string, nextToken string, limit int32) ([]*Wallet, string, error)
 	GetWallet(ctx context.Context, ownerID string, walletID string) (*Wallet, error)
 	EditWallet(ctx context.Context, ownerID string, walletID string, changedFields map[string]any) error
 	SetActiveWallet(ctx context.Context, ownerID string, walletID string, isActive bool) error
@@ -82,14 +82,14 @@ func (service *service) CreateWallet(ctx context.Context, ownerID string, name s
 	return nil
 }
 
-func (service *service) GetWalletList(ctx context.Context, ownerID string, nextToken string, limit int32) ([]*Wallet, string, error) {
+func (service *service) ListWallets(ctx context.Context, ownerID string, nextToken string, limit int32) ([]*Wallet, string, error) {
 	if limit < 0 {
 		return nil, "", errors.New("limit must be greater than or equal to 0")
 	}
 	if limit == 0 {
 		limit = utils.DEFAULT_PAGINATION_SIZE
 	}
-	return service.repository.GetWalletList(
+	return service.repository.ListWallets(
 		ctx,
 		ownerID,
 		nextToken,

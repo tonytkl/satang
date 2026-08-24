@@ -87,7 +87,7 @@ func TestWalletRepositoryCreateWallet(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestWalletRepositoryGetWalletList(t *testing.T) {
+func TestWalletRepositoryListWallets(t *testing.T) {
 	db := &mockWalletDynamoDB{
 		queryItemsWithPaginationFn: func(_ context.Context, table string, keyConditionExpression string, expressionValues map[string]any, _, _ string, limit int32, nextToken string, out any) (string, error) {
 			require.Equal(t, "wallets", table)
@@ -105,7 +105,7 @@ func TestWalletRepositoryGetWalletList(t *testing.T) {
 	}
 
 	repo := NewWalletRepository(db, "wallets")
-	got, nextToken, err := repo.GetWalletList(context.Background(), "owner-1", "tok-1", 10)
+	got, nextToken, err := repo.ListWallets(context.Background(), "owner-1", "tok-1", 10)
 	require.NoError(t, err)
 	require.Len(t, got, 1)
 	assert.Equal(t, "wallet-1", got[0].ID)

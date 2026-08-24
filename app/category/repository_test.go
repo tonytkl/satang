@@ -87,7 +87,7 @@ func TestCategoryRepositoryCreateCategory(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestCategoryRepositoryGetCategoryList(t *testing.T) {
+func TestCategoryRepositoryListCategories(t *testing.T) {
 	db := &mockCategoryDynamoDB{
 		queryItemsWithPaginationFn: func(_ context.Context, table string, keyConditionExpression string, expressionValues map[string]any, _, _ string, limit int32, nextToken string, out any) (string, error) {
 			require.Equal(t, "categories", table)
@@ -105,7 +105,7 @@ func TestCategoryRepositoryGetCategoryList(t *testing.T) {
 	}
 
 	repo := NewCategoryRepository(db, "categories")
-	got, nextToken, err := repo.GetCategoryList(context.Background(), "owner-1", "tok-1", 5)
+	got, nextToken, err := repo.ListCategories(context.Background(), "owner-1", "tok-1", 5)
 	require.NoError(t, err)
 	require.Len(t, got, 1)
 	assert.Equal(t, "category-1", got[0].ID)

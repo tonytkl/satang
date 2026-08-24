@@ -10,7 +10,7 @@ import (
 
 type Service interface {
 	CreateCategory(ctx context.Context, ownerID string, name string, strCategoryType string) error
-	GetCategoryList(ctx context.Context, ownerID string, nextToken string, limit int32) ([]*Category, string, error)
+	ListCategories(ctx context.Context, ownerID string, nextToken string, limit int32) ([]*Category, string, error)
 	GetCategory(ctx context.Context, ownerID string, categoryID string) (*Category, error)
 	EditCategory(ctx context.Context, ownerID string, categoryID string, changedFields map[string]any) error
 	SetActiveCategory(ctx context.Context, ownerID string, categoryID string, isActive bool) error
@@ -50,14 +50,14 @@ func (service *service) CreateCategory(ctx context.Context, ownerID string, name
 	return nil
 }
 
-func (service *service) GetCategoryList(ctx context.Context, ownerID string, nextToken string, limit int32) ([]*Category, string, error) {
+func (service *service) ListCategories(ctx context.Context, ownerID string, nextToken string, limit int32) ([]*Category, string, error) {
 	if limit < 0 {
 		return nil, "", errors.New("limit must be greater than or equal to 0")
 	}
 	if limit == 0 {
 		limit = utils.DEFAULT_PAGINATION_SIZE
 	}
-	return service.repository.GetCategoryList(
+	return service.repository.ListCategories(
 		ctx,
 		ownerID,
 		nextToken,

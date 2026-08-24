@@ -12,11 +12,11 @@ import (
 )
 
 type mockWalletRepository struct {
-	createWalletFn  func(ctx context.Context, wallet *Wallet) error
-	getWalletListFn func(ctx context.Context, ownerID string, nextToken string, limit int32) ([]*Wallet, string, error)
-	getWalletFn     func(ctx context.Context, ownerID string, walletID string) (*Wallet, error)
-	editWalletFn    func(ctx context.Context, ownerID string, walletID string, changedFields map[string]any) error
-	deleteWalletFn  func(ctx context.Context, ownerID string, walletID string) error
+	createWalletFn func(ctx context.Context, wallet *Wallet) error
+	listWalletsFn  func(ctx context.Context, ownerID string, nextToken string, limit int32) ([]*Wallet, string, error)
+	getWalletFn    func(ctx context.Context, ownerID string, walletID string) (*Wallet, error)
+	editWalletFn   func(ctx context.Context, ownerID string, walletID string, changedFields map[string]any) error
+	deleteWalletFn func(ctx context.Context, ownerID string, walletID string) error
 }
 
 var _ WalletRepository = (*mockWalletRepository)(nil)
@@ -28,9 +28,9 @@ func (m *mockWalletRepository) CreateWallet(ctx context.Context, wallet *Wallet)
 	return nil
 }
 
-func (m *mockWalletRepository) GetWalletList(ctx context.Context, ownerID string, nextToken string, limit int32) ([]*Wallet, string, error) {
-	if m.getWalletListFn != nil {
-		return m.getWalletListFn(ctx, ownerID, nextToken, limit)
+func (m *mockWalletRepository) ListWallets(ctx context.Context, ownerID string, nextToken string, limit int32) ([]*Wallet, string, error) {
+	if m.listWalletsFn != nil {
+		return m.listWalletsFn(ctx, ownerID, nextToken, limit)
 	}
 	return nil, "", nil
 }
@@ -135,17 +135,17 @@ func TestCreateWalletRejectsEmptyOwnerID(t *testing.T) {
 	assert.False(t, repoCalled)
 }
 
-func TestGetWalletListRejectsNegativeLimit(t *testing.T) {
+func TestListWalletsRejectsNegativeLimit(t *testing.T) {
 	repoCalled := false
 	repo := &mockWalletRepository{
-		getWalletListFn: func(ctx context.Context, ownerID string, nextToken string, limit int32) ([]*Wallet, string, error) {
+		listWalletsFn: func(ctx context.Context, ownerID string, nextToken string, limit int32) ([]*Wallet, string, error) {
 			repoCalled = true
 			return []*Wallet{}, "", nil
 		},
 	}
 
 	service := NewService(repo, &mockTransactionService{})
-	_, _, err := service.GetWalletList(context.Background(), "user-1", "", -1)
+	_, _, err := service.ListWallets(context.Background(), "user-1", "", -1)
 
 	require.Error(t, err)
 	assert.Equal(t, "limit must be greater than or equal to 0", err.Error())

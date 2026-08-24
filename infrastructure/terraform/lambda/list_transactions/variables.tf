@@ -1,5 +1,5 @@
 variable "lambda_role_arn" {
-  description = "IAM role ARN used by the get list transactions Lambda"
+  description = "IAM role ARN used by the list transactions Lambda"
   type        = string
 }
 

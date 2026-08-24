@@ -75,8 +75,11 @@ jobs:
         continue-on-error: true
         with:
           header: go-coverage
+          recreate: true
           message: |
             ## Go Test Coverage
             - Total coverage: **${{ steps.coverage.outputs.coverage }}%**
             - Minimum required: **${{ env.MIN_COVERAGE }}%**
             - Threshold check: **${{ steps.coverage.outcome == 'success' && 'PASS' || 'FAIL' }}**
+            - Commit: **${{ github.sha }}**
+            - Run: [#${{ github.run_number }}](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})

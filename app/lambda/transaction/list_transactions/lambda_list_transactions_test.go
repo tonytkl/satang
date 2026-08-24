@@ -33,13 +33,13 @@ func (m *mockTransactionService) GetTransactionsBetweenPeriod(ctx context.Contex
 	return nil, "", nil
 }
 
-func TestGetListTransactionsLambdaHandleSuccess(t *testing.T) {
+func TestListTransactionsLambdaHandleSuccess(t *testing.T) {
 	expectedFromDate := time.Date(2025, 5, 1, 0, 0, 0, 0, time.UTC)
 	expectedToDate := time.Date(2025, 5, 31, 0, 0, 0, 0, time.UTC)
 	expectedLimit := int32(10)
 	expectedNextToken := "next-token-1"
 
-	handler := &getListTransactionsLambda{
+	handler := &listTransactionsLambda{
 		service: &mockTransactionService{
 			getTransactionsBetweenPeriodFunc: func(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, nextToken string) ([]transaction.Transaction, string, error) {
 				assert.Equal(t, "1", ownerID)
@@ -78,7 +78,7 @@ func TestGetListTransactionsLambdaHandleSuccess(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusOK, response.StatusCode)
 
-	var payload getListTransactionResponse
+	var payload listTransactionsResponse
 	err = json.Unmarshal([]byte(response.Body), &payload)
 	require.NoError(t, err)
 	require.Len(t, payload.Transactions, 1)
@@ -88,8 +88,8 @@ func TestGetListTransactionsLambdaHandleSuccess(t *testing.T) {
 	assert.Equal(t, "next-token-2", payload.NextToken)
 }
 
-func TestGetListTransactionsLambdaHandleInvalidLimit(t *testing.T) {
-	handler := &getListTransactionsLambda{service: &mockTransactionService{}}
+func TestListTransactionsLambdaHandleInvalidLimit(t *testing.T) {
+	handler := &listTransactionsLambda{service: &mockTransactionService{}}
 
 	response, err := handler.Handle(context.Background(), events.APIGatewayV2HTTPRequest{
 		QueryStringParameters: map[string]string{"limit": "abc"},
@@ -104,8 +104,8 @@ func TestGetListTransactionsLambdaHandleInvalidLimit(t *testing.T) {
 	assert.Equal(t, "limit must be a valid integer", payload.Message)
 }
 
-func TestGetListTransactionsLambdaHandleInvalidFromDate(t *testing.T) {
-	handler := &getListTransactionsLambda{service: &mockTransactionService{}}
+func TestListTransactionsLambdaHandleInvalidFromDate(t *testing.T) {
+	handler := &listTransactionsLambda{service: &mockTransactionService{}}
 
 	response, err := handler.Handle(context.Background(), events.APIGatewayV2HTTPRequest{
 		QueryStringParameters: map[string]string{"fromDate": "invalid-date"},
@@ -120,8 +120,8 @@ func TestGetListTransactionsLambdaHandleInvalidFromDate(t *testing.T) {
 	assert.Contains(t, payload.Message, "invalid")
 }
 
-func TestGetListTransactionsLambdaHandleServiceError(t *testing.T) {
-	handler := &getListTransactionsLambda{
+func TestListTransactionsLambdaHandleServiceError(t *testing.T) {
+	handler := &listTransactionsLambda{
 		service: &mockTransactionService{
 			getTransactionsBetweenPeriodFunc: func(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, nextToken string) ([]transaction.Transaction, string, error) {
 				return nil, "", errors.New("database unavailable")
@@ -145,8 +145,8 @@ func TestGetListTransactionsLambdaHandleServiceError(t *testing.T) {
 	assert.Equal(t, "database unavailable", payload.Message)
 }
 
-func TestGetListTransactionsLambdaHandleInvalidTransactionSchema(t *testing.T) {
-	handler := &getListTransactionsLambda{
+func TestListTransactionsLambdaHandleInvalidTransactionSchema(t *testing.T) {
+	handler := &listTransactionsLambda{
 		service: &mockTransactionService{
 			getTransactionsBetweenPeriodFunc: func(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, nextToken string) ([]transaction.Transaction, string, error) {
 				return []transaction.Transaction{{

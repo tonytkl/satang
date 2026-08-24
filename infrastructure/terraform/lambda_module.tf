@@ -20,8 +20,8 @@ module "lambda_get_transaction" {
   ]
 }
 
-module "lambda_get_list_transactions" {
-  source          = "./lambda/get_list_transactions"
+module "lambda_list_transactions" {
+  source          = "./lambda/list_transactions"
   lambda_role_arn = aws_iam_role.lambda_role.arn
   table_name      = aws_dynamodb_table.dynamodb_table.name
 
@@ -30,3 +30,4 @@ module "lambda_get_list_transactions" {
     aws_iam_role_policy.lambda_dynamodb_access
   ]
 }
+

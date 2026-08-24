@@ -11,7 +11,7 @@ import (
 
 type mockCategoryRepository struct {
 	createCategoryFn  func(ctx context.Context, category *Category) error
-	getCategoryListFn func(ctx context.Context, ownerID string, nextToken string, limit int32) ([]*Category, string, error)
+	listCategoriesFn  func(ctx context.Context, ownerID string, nextToken string, limit int32) ([]*Category, string, error)
 	getCategoryFn     func(ctx context.Context, ownerID string, categoryID string) (*Category, error)
 	editCategoryFn    func(ctx context.Context, ownerID string, categoryID string, changedFields map[string]any) error
 	deleteCategoryFn  func(ctx context.Context, ownerID string, categoryID string) error
@@ -26,9 +26,9 @@ func (m *mockCategoryRepository) CreateCategory(ctx context.Context, category *C
 	return nil
 }
 
-func (m *mockCategoryRepository) GetCategoryList(ctx context.Context, ownerID string, nextToken string, limit int32) ([]*Category, string, error) {
-	if m.getCategoryListFn != nil {
-		return m.getCategoryListFn(ctx, ownerID, nextToken, limit)
+func (m *mockCategoryRepository) ListCategories(ctx context.Context, ownerID string, nextToken string, limit int32) ([]*Category, string, error) {
+	if m.listCategoriesFn != nil {
+		return m.listCategoriesFn(ctx, ownerID, nextToken, limit)
 	}
 	return nil, "", nil
 }
@@ -128,33 +128,33 @@ func TestEditCategoryRejectsProtectedFields(t *testing.T) {
 	assert.False(t, repoCalled)
 }
 
-func TestGetCategoryListUsesDefaultLimitWhenZero(t *testing.T) {
+func TestListCategoriesUsesDefaultLimitWhenZero(t *testing.T) {
 	var gotLimit int32
 	repo := &mockCategoryRepository{
-		getCategoryListFn: func(ctx context.Context, ownerID string, nextToken string, limit int32) ([]*Category, string, error) {
+		listCategoriesFn: func(ctx context.Context, ownerID string, nextToken string, limit int32) ([]*Category, string, error) {
 			gotLimit = limit
 			return []*Category{}, "", nil
 		},
 	}
 
 	svc := NewService(repo)
-	_, _, err := svc.GetCategoryList(context.Background(), "user-1", "", 0)
+	_, _, err := svc.ListCategories(context.Background(), "user-1", "", 0)
 
 	require.NoError(t, err)
 	assert.Equal(t, int32(30), gotLimit)
 }
 
-func TestGetCategoryListRejectsNegativeLimit(t *testing.T) {
+func TestListCategoriesRejectsNegativeLimit(t *testing.T) {
 	repoCalled := false
 	repo := &mockCategoryRepository{
-		getCategoryListFn: func(ctx context.Context, ownerID string, nextToken string, limit int32) ([]*Category, string, error) {
+		listCategoriesFn: func(ctx context.Context, ownerID string, nextToken string, limit int32) ([]*Category, string, error) {
 			repoCalled = true
 			return []*Category{}, "", nil
 		},
 	}
 
 	svc := NewService(repo)
-	_, _, err := svc.GetCategoryList(context.Background(), "user-1", "", -1)
+	_, _, err := svc.ListCategories(context.Background(), "user-1", "", -1)
 
 	require.Error(t, err)
 	assert.Equal(t, "limit must be greater than or equal to 0", err.Error())

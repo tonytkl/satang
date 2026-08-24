@@ -9,7 +9,7 @@ import (
 
 type CategoryRepository interface {
 	CreateCategory(ctx context.Context, category *Category) error
-	GetCategoryList(ctx context.Context, ownerID string, nextToken string, limit int32) ([]*Category, string, error)
+	ListCategories(ctx context.Context, ownerID string, nextToken string, limit int32) ([]*Category, string, error)
 	GetCategory(ctx context.Context, ownerID string, categoryID string) (*Category, error)
 	EditCategory(ctx context.Context, ownerID string, categoryID string, changedFields map[string]any) error
 	DeleteCategory(ctx context.Context, ownerID string, categoryID string) error
@@ -33,7 +33,7 @@ func (categoryRepository *categoryRepository) CreateCategory(ctx context.Context
 	return categoryRepository.baseRepository.Save(ctx, category)
 }
 
-func (categoryRepository *categoryRepository) GetCategoryList(ctx context.Context, ownerID string, nextToken string, limit int32) ([]*Category, string, error) {
+func (categoryRepository *categoryRepository) ListCategories(ctx context.Context, ownerID string, nextToken string, limit int32) ([]*Category, string, error) {
 	return categoryRepository.baseRepository.List(ctx, ownerID, nextToken, limit)
 }
 

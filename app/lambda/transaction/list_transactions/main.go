@@ -20,11 +20,11 @@ type errorResponse struct {
 	Message string `json:"message"`
 }
 
-type getListTransactionsLambda struct {
+type listTransactionsLambda struct {
 	service transaction.TransactionService
 }
 
-type getListTransactionResponse struct {
+type listTransactionsResponse struct {
 	Transactions []transaction.TransactionSchemas `json:"transactions"`
 	NextToken    string                           `json:"nextToken"`
 }
@@ -44,12 +44,12 @@ func main() {
 	repository := transaction.NewTransactionRepository(db, tableName)
 	transactionService := transaction.NewTransactionService(repository)
 
-	handler := getListTransactionsLambda{service: transactionService}
+	handler := listTransactionsLambda{service: transactionService}
 
 	lambda.Start(handler.Handle)
 }
 
-func (handler *getListTransactionsLambda) Handle(ctx context.Context, request events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error) {
+func (handler *listTransactionsLambda) Handle(ctx context.Context, request events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error) {
 	// TODO: Get user from authentication context
 	ownerID := "1"
 
@@ -103,7 +103,7 @@ func (handler *getListTransactionsLambda) Handle(ctx context.Context, request ev
 		return utils.JsonResponse(http.StatusInternalServerError, errorResponse{Message: err.Error()})
 	}
 
-	response := getListTransactionResponse{
+	response := listTransactionsResponse{
 		Transactions: responseTransactions,
 		NextToken:    nextToken,
 	}

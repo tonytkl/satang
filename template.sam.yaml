@@ -34,7 +34,7 @@ Resources:
     Metadata:
       BuildMethod: go1.x
     Properties:
-      CodeUri: app/lambda/transactions/create_transaction
+      CodeUri: app/lambda/transaction/create_transaction
       Handler: bootstrap
       Events:
         CreateTransactionApi:
@@ -44,15 +44,15 @@ Resources:
             Path: /api/v1.0/transactions
             Method: POST
 
-  GetListTransactionsFunction:
+  ListTransactionsFunction:
     Type: AWS::Serverless::Function
     Metadata:
       BuildMethod: go1.x
     Properties:
-      CodeUri: app/lambda/transactions/get_list_transactions
+      CodeUri: app/lambda/transaction/list_transactions
       Handler: bootstrap
       Events:
-        GetListTransactionsApi:
+        ListTransactionsApi:
           Type: HttpApi
           Properties:
             ApiId: !Ref SatangLocalHttpApi
@@ -64,7 +64,7 @@ Resources:
     Metadata:
       BuildMethod: go1.x
     Properties:
-      CodeUri: app/lambda/transactions/get_transaction
+      CodeUri: app/lambda/transaction/get_transaction
       Handler: bootstrap
       Events:
         GetTransactionApi:

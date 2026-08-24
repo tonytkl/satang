@@ -9,7 +9,7 @@ import (
 
 type WalletRepository interface {
 	CreateWallet(ctx context.Context, wallet *Wallet) error
-	GetWalletList(ctx context.Context, ownerID string, nextToken string, limit int32) ([]*Wallet, string, error)
+	ListWallets(ctx context.Context, ownerID string, nextToken string, limit int32) ([]*Wallet, string, error)
 	GetWallet(ctx context.Context, ownerID string, walletID string) (*Wallet, error)
 	EditWallet(ctx context.Context, ownerID string, walletID string, changedFields map[string]any) error
 	DeleteWallet(ctx context.Context, ownerID string, walletID string) error
@@ -33,7 +33,7 @@ func (walletRepository *walletRepository) CreateWallet(ctx context.Context, wall
 	return walletRepository.baseRepository.Save(ctx, wallet)
 }
 
-func (walletRepository *walletRepository) GetWalletList(ctx context.Context, ownerID string, nextToken string, limit int32) ([]*Wallet, string, error) {
+func (walletRepository *walletRepository) ListWallets(ctx context.Context, ownerID string, nextToken string, limit int32) ([]*Wallet, string, error) {
 	return walletRepository.baseRepository.List(ctx, ownerID, nextToken, limit)
 }
 

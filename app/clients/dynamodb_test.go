@@ -125,12 +125,12 @@ func TestDynamoDBUpdateItemWithoutOptionalFields(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestDynamoDBQueryItems(t *testing.T) {
+func TestDynamoDBQueryItemsWithIndex(t *testing.T) {
 	client := newTestClient(t, func(t *testing.T, writer http.ResponseWriter, request *http.Request, payload map[string]any) {
 		assert.Equal(t, "DynamoDB_20120810.Query", request.Header.Get("X-Amz-Target"))
 		assert.Equal(t, "transactions", payload["TableName"])
-		assert.Equal(t, "user_id = :user_id", payload["KeyConditionExpression"])
-		assert.Equal(t, "user-index", payload["IndexName"])
+		assert.Equal(t, "GSI1_PK = :user_id", payload["KeyConditionExpression"])
+		assert.Equal(t, "GSI1", payload["IndexName"])
 
 		values := payload["ExpressionAttributeValues"].(map[string]any)
 		assert.Equal(t, "user-1", values[":user_id"].(map[string]any)["S"])
@@ -152,12 +152,14 @@ func TestDynamoDBQueryItems(t *testing.T) {
 	})
 
 	var got []testTransaction
-	err := client.QueryItems(
+	_, err := client.QueryItemsWithPagination(
 		context.Background(),
 		"transactions",
-		"user_id = :user_id",
+		"GSI1_PK = :user_id",
 		map[string]any{":user_id": "user-1"},
-		"user-index",
+		"GSI1",
+		"",
+		0,
 		"",
 		&got,
 	)
@@ -207,7 +209,7 @@ func TestDynamoDBQueryItemsWithPagination(t *testing.T) {
 		"transactions",
 		"user_id = :user_id",
 		map[string]any{":user_id": "user-1"},
-		"user-index",
+		"",
 		"",
 		10,
 		nextToken,
@@ -230,7 +232,7 @@ func TestDynamoDBQueryItemsWithPaginationInvalidToken(t *testing.T) {
 		"transactions",
 		"user_id = :user_id",
 		map[string]any{":user_id": "user-1"},
-		"user-index",
+		"",
 		"",
 		10,
 		"not-base64",

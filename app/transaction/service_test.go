@@ -10,51 +10,55 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// mockTransactionRepository implements repositories.TransactionRepository for testing
+// mockTransactionRepository implements TransactionRepository for testing.
 type mockTransactionRepository struct {
-	createFn              func(ctx context.Context, transaction *Transaction) error
-	getByKeyFn            func(ctx context.Context, id string, ownerID string) (*Transaction, error)
-	listWithinDateRangeFn func(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, nextToken string) ([]Transaction, string, error)
+	createTransactionFn          func(ctx context.Context, transaction *Transaction) error
+	getTransactionFn             func(ctx context.Context, ownerID string, transactionID string) (*Transaction, error)
+	listTransactionsOfSubModelFn func(ctx context.Context, subModelName string, targetID string, ownerID string, fromDate time.Time, toDate time.Time, nextToken string, limit int32) ([]Transaction, string, error)
+	editTransactionFn            func(ctx context.Context, ownerID string, transactionID string, changedFields map[string]any) error
+	deleteTransactionFn          func(ctx context.Context, ownerID string, transactionID string) error
 }
 
 var _ TransactionRepository = (*mockTransactionRepository)(nil)
 
-func (m *mockTransactionRepository) Create(ctx context.Context, transaction *Transaction) error {
-	if m.createFn != nil {
-		return m.createFn(ctx, transaction)
+func (m *mockTransactionRepository) CreateTransaction(ctx context.Context, transaction *Transaction) error {
+	if m.createTransactionFn != nil {
+		return m.createTransactionFn(ctx, transaction)
 	}
 	return nil
 }
 
-func (m *mockTransactionRepository) GetByKey(ctx context.Context, id string, ownerID string) (*Transaction, error) {
-	if m.getByKeyFn != nil {
-		return m.getByKeyFn(ctx, id, ownerID)
+func (m *mockTransactionRepository) GetTransaction(ctx context.Context, ownerID string, transactionID string) (*Transaction, error) {
+	if m.getTransactionFn != nil {
+		return m.getTransactionFn(ctx, ownerID, transactionID)
 	}
 	return nil, nil
 }
 
-func (m *mockTransactionRepository) ListByGSI(ctx context.Context, indexName string, indexPartitionKeyPrefix string, targetID string, ownerID string, fromDate *time.Time, toDate *time.Time) ([]Transaction, error) {
-	return nil, nil
+func (m *mockTransactionRepository) EditTransaction(ctx context.Context, ownerID string, transactionID string, changedFields map[string]any) error {
+	if m.editTransactionFn != nil {
+		return m.editTransactionFn(ctx, ownerID, transactionID, changedFields)
+	}
+	return nil
 }
 
-func (m *mockTransactionRepository) ListWithinDateRange(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, nextToken string) ([]Transaction, string, error) {
-	if m.listWithinDateRangeFn != nil {
-		return m.listWithinDateRangeFn(ctx, ownerID, fromDate, toDate, limit, nextToken)
+func (m *mockTransactionRepository) DeleteTransaction(ctx context.Context, ownerID string, transactionID string) error {
+	if m.deleteTransactionFn != nil {
+		return m.deleteTransactionFn(ctx, ownerID, transactionID)
+	}
+	return nil
+}
+
+func (m *mockTransactionRepository) ListTransactionsOfSubModel(ctx context.Context, subModelName string, targetID string, ownerID string, fromDate time.Time, toDate time.Time, nextToken string, limit int32) ([]Transaction, string, error) {
+	if m.listTransactionsOfSubModelFn != nil {
+		return m.listTransactionsOfSubModelFn(ctx, subModelName, targetID, ownerID, fromDate, toDate, nextToken, limit)
 	}
 	return nil, "", nil
 }
 
-func (m *mockTransactionRepository) Update(ctx context.Context, ownerID string, transactionDate string, transactionID string, transaction *Transaction) error {
-	return nil
-}
-
-func (m *mockTransactionRepository) Delete(ctx context.Context, ownerID string, transactionDate string, transactionID string) error {
-	return nil
-}
-
 func TestCreateTransactionSuccess(t *testing.T) {
 	mock := &mockTransactionRepository{
-		createFn: func(ctx context.Context, transaction *Transaction) error {
+		createTransactionFn: func(ctx context.Context, transaction *Transaction) error {
 			assert.Equal(t, 100.0, transaction.Amount)
 			assert.Equal(t, "USD", transaction.Currency)
 			assert.Equal(t, "wallet-1", transaction.WalletID)
@@ -86,8 +90,7 @@ func TestCreateTransactionSuccess(t *testing.T) {
 }
 
 func TestCreateTransactionInvalidType(t *testing.T) {
-	mock := &mockTransactionRepository{}
-	service := NewTransactionService(mock)
+	service := NewTransactionService(&mockTransactionRepository{})
 	ctx := context.Background()
 	testDate := time.Date(2026, time.April, 15, 10, 0, 0, 0, time.UTC)
 
@@ -109,8 +112,7 @@ func TestCreateTransactionInvalidType(t *testing.T) {
 }
 
 func TestCreateTransactionMissingAmount(t *testing.T) {
-	mock := &mockTransactionRepository{}
-	service := NewTransactionService(mock)
+	service := NewTransactionService(&mockTransactionRepository{})
 	ctx := context.Background()
 	testDate := time.Date(2026, time.April, 15, 10, 0, 0, 0, time.UTC)
 
@@ -124,7 +126,7 @@ func TestCreateTransactionMissingAmount(t *testing.T) {
 		"USD",
 		"https://example.com/image.png",
 		"expense",
-		0, // amount is 0
+		0,
 		testDate,
 		"user-1",
 	)
@@ -132,8 +134,7 @@ func TestCreateTransactionMissingAmount(t *testing.T) {
 }
 
 func TestCreateTransactionMissingCurrency(t *testing.T) {
-	mock := &mockTransactionRepository{}
-	service := NewTransactionService(mock)
+	service := NewTransactionService(&mockTransactionRepository{})
 	ctx := context.Background()
 	testDate := time.Date(2026, time.April, 15, 10, 0, 0, 0, time.UTC)
 
@@ -144,7 +145,7 @@ func TestCreateTransactionMissingCurrency(t *testing.T) {
 		"category-1",
 		"Groceries",
 		"Weekly grocery shopping",
-		"", // empty currency
+		"",
 		"https://example.com/image.png",
 		"expense",
 		100.0,
@@ -155,14 +156,13 @@ func TestCreateTransactionMissingCurrency(t *testing.T) {
 }
 
 func TestCreateTransactionMissingWalletID(t *testing.T) {
-	mock := &mockTransactionRepository{}
-	service := NewTransactionService(mock)
+	service := NewTransactionService(&mockTransactionRepository{})
 	ctx := context.Background()
 	testDate := time.Date(2026, time.April, 15, 10, 0, 0, 0, time.UTC)
 
 	err := service.CreateTransaction(
 		ctx,
-		"", // empty wallet ID
+		"",
 		"My Wallet",
 		"category-1",
 		"Groceries",
@@ -178,8 +178,7 @@ func TestCreateTransactionMissingWalletID(t *testing.T) {
 }
 
 func TestCreateTransactionMissingCategoryID(t *testing.T) {
-	mock := &mockTransactionRepository{}
-	service := NewTransactionService(mock)
+	service := NewTransactionService(&mockTransactionRepository{})
 	ctx := context.Background()
 	testDate := time.Date(2026, time.April, 15, 10, 0, 0, 0, time.UTC)
 
@@ -187,7 +186,7 @@ func TestCreateTransactionMissingCategoryID(t *testing.T) {
 		ctx,
 		"wallet-1",
 		"My Wallet",
-		"", // empty category ID
+		"",
 		"Groceries",
 		"Weekly grocery shopping",
 		"USD",
@@ -201,10 +200,9 @@ func TestCreateTransactionMissingCategoryID(t *testing.T) {
 }
 
 func TestCreateTransactionMissingDate(t *testing.T) {
-	mock := &mockTransactionRepository{}
-	service := NewTransactionService(mock)
+	service := NewTransactionService(&mockTransactionRepository{})
 	ctx := context.Background()
-	zeroDate := time.Time{} // zero value date
+	zeroDate := time.Time{}
 
 	err := service.CreateTransaction(
 		ctx,
@@ -226,7 +224,7 @@ func TestCreateTransactionMissingDate(t *testing.T) {
 func TestCreateTransactionRepositoryError(t *testing.T) {
 	expectedErr := errors.New("database error")
 	mock := &mockTransactionRepository{
-		createFn: func(ctx context.Context, transaction *Transaction) error {
+		createTransactionFn: func(ctx context.Context, transaction *Transaction) error {
 			return expectedErr
 		},
 	}
@@ -265,8 +263,9 @@ func TestGetTransactionSuccess(t *testing.T) {
 	}
 
 	mock := &mockTransactionRepository{
-		getByKeyFn: func(ctx context.Context, id string, ownerID string) (*Transaction, error) {
-			assert.Equal(t, "tx-1", id)
+		getTransactionFn: func(ctx context.Context, ownerID string, transactionID string) (*Transaction, error) {
+			assert.Equal(t, "user-1", ownerID)
+			assert.Equal(t, "tx-1", transactionID)
 			return expectedTx, nil
 		},
 	}
@@ -274,14 +273,13 @@ func TestGetTransactionSuccess(t *testing.T) {
 	service := NewTransactionService(mock)
 	ctx := context.Background()
 
-	tx, err := service.GetTransaction(ctx, "tx-1", "1")
+	tx, err := service.GetTransaction(ctx, "tx-1", "user-1")
 	require.NoError(t, err)
 	assert.Equal(t, expectedTx, tx)
 }
 
 func TestGetTransactionEmptyID(t *testing.T) {
-	mock := &mockTransactionRepository{}
-	service := NewTransactionService(mock)
+	service := NewTransactionService(&mockTransactionRepository{})
 	ctx := context.Background()
 
 	tx, err := service.GetTransaction(ctx, "", "")
@@ -292,7 +290,7 @@ func TestGetTransactionEmptyID(t *testing.T) {
 func TestGetTransactionRepositoryError(t *testing.T) {
 	expectedErr := errors.New("database error")
 	mock := &mockTransactionRepository{
-		getByKeyFn: func(ctx context.Context, id string, ownerID string) (*Transaction, error) {
+		getTransactionFn: func(ctx context.Context, ownerID string, transactionID string) (*Transaction, error) {
 			return nil, expectedErr
 		},
 	}
@@ -300,7 +298,7 @@ func TestGetTransactionRepositoryError(t *testing.T) {
 	service := NewTransactionService(mock)
 	ctx := context.Background()
 
-	tx, err := service.GetTransaction(ctx, "tx-1", "1")
+	tx, err := service.GetTransaction(ctx, "tx-1", "user-1")
 	require.ErrorIs(t, err, expectedErr)
 	assert.Nil(t, tx)
 }
@@ -322,7 +320,7 @@ func TestCreateTransactionAllTypes(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			mock := &mockTransactionRepository{
-				createFn: func(ctx context.Context, transaction *Transaction) error {
+				createTransactionFn: func(ctx context.Context, transaction *Transaction) error {
 					assert.Equal(t, tc.wantType, transaction.Type)
 					return nil
 				},
@@ -351,41 +349,131 @@ func TestCreateTransactionAllTypes(t *testing.T) {
 	}
 }
 
-func TestGetTransactionsBetweenPeriodSuccess(t *testing.T) {
+func TestListTransactionsDefaultsAndDelegatesToRepository(t *testing.T) {
 	from := time.Date(2026, time.April, 1, 0, 0, 0, 0, time.UTC)
 	to := time.Date(2026, time.April, 30, 0, 0, 0, 0, time.UTC)
 
 	mock := &mockTransactionRepository{
-		listWithinDateRangeFn: func(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, nextToken string) ([]Transaction, string, error) {
+		listTransactionsOfSubModelFn: func(ctx context.Context, subModelName string, targetID string, ownerID string, fromDate time.Time, toDate time.Time, nextToken string, limit int32) ([]Transaction, string, error) {
+			assert.Equal(t, "date", subModelName)
+			assert.Equal(t, "", targetID)
 			assert.Equal(t, "user-1", ownerID)
 			assert.Equal(t, from, fromDate)
 			assert.Equal(t, to, toDate)
 			assert.Equal(t, int32(25), limit)
 			assert.Equal(t, "token-1", nextToken)
-
 			return []Transaction{{ID: "tx-1"}}, "token-2", nil
 		},
 	}
 
 	service := NewTransactionService(mock)
-	txs, token, err := service.GetTransactionsBetweenPeriod(context.Background(), "user-1", from, to, 25, "token-1")
+	txs, token, err := service.ListTransactions(context.Background(), "user-1", from, to, 25, "token-1")
 	require.NoError(t, err)
 	assert.Len(t, txs, 1)
 	assert.Equal(t, "tx-1", txs[0].ID)
 	assert.Equal(t, "token-2", token)
 }
 
-func TestGetTransactionsBetweenPeriodValidation(t *testing.T) {
+func TestListTransactionsValidation(t *testing.T) {
 	service := NewTransactionService(&mockTransactionRepository{})
 	from := time.Date(2026, time.April, 1, 0, 0, 0, 0, time.UTC)
 	to := time.Date(2026, time.April, 30, 0, 0, 0, 0, time.UTC)
 
-	_, _, err := service.GetTransactionsBetweenPeriod(context.Background(), "", from, to, 10, "")
+	_, _, err := service.ListTransactions(context.Background(), "", from, to, 10, "")
 	require.EqualError(t, err, "owner ID is required")
 
-	_, _, err = service.GetTransactionsBetweenPeriod(context.Background(), "user-1", time.Time{}, to, 10, "")
-	require.EqualError(t, err, "from date and to date are required")
+	_, _, err = service.ListTransactions(context.Background(), "user-1", time.Time{}, to, 10, "")
+	require.NoError(t, err)
 
-	_, _, err = service.GetTransactionsBetweenPeriod(context.Background(), "user-1", from, to, -1, "")
+	_, _, err = service.ListTransactions(context.Background(), "user-1", from, to, -1, "")
 	require.EqualError(t, err, "limit must be greater than or equal to 0")
+}
+
+func TestListTransactionsOfCategoryDelegatesToRepository(t *testing.T) {
+	from := time.Date(2026, time.April, 1, 0, 0, 0, 0, time.UTC)
+	to := time.Date(2026, time.April, 30, 0, 0, 0, 0, time.UTC)
+
+	mock := &mockTransactionRepository{
+		listTransactionsOfSubModelFn: func(ctx context.Context, subModelName string, targetID string, ownerID string, fromDate time.Time, toDate time.Time, nextToken string, limit int32) ([]Transaction, string, error) {
+			assert.Equal(t, "category", subModelName)
+			assert.Equal(t, "category-1", targetID)
+			assert.Equal(t, "user-1", ownerID)
+			assert.Equal(t, from, fromDate)
+			assert.Equal(t, to, toDate)
+			assert.Equal(t, int32(15), limit)
+			assert.Equal(t, "token-1", nextToken)
+			return []Transaction{{ID: "tx-2"}}, "token-3", nil
+		},
+	}
+
+	service := NewTransactionService(mock)
+	txs, token, err := service.ListTransactionsOfCategory(context.Background(), "user-1", from, to, 15, "token-1", "category-1")
+	require.NoError(t, err)
+	assert.Len(t, txs, 1)
+	assert.Equal(t, "tx-2", txs[0].ID)
+	assert.Equal(t, "token-3", token)
+}
+
+func TestListTransactionsOfWalletDelegatesToRepository(t *testing.T) {
+	from := time.Date(2026, time.April, 1, 0, 0, 0, 0, time.UTC)
+	to := time.Date(2026, time.April, 30, 0, 0, 0, 0, time.UTC)
+
+	mock := &mockTransactionRepository{
+		listTransactionsOfSubModelFn: func(ctx context.Context, subModelName string, targetID string, ownerID string, fromDate time.Time, toDate time.Time, nextToken string, limit int32) ([]Transaction, string, error) {
+			assert.Equal(t, "wallet", subModelName)
+			assert.Equal(t, "wallet-1", targetID)
+			assert.Equal(t, "user-1", ownerID)
+			assert.Equal(t, from, fromDate)
+			assert.Equal(t, to, toDate)
+			assert.Equal(t, int32(20), limit)
+			assert.Equal(t, "token-2", nextToken)
+			return []Transaction{{ID: "tx-3"}}, "token-4", nil
+		},
+	}
+
+	service := NewTransactionService(mock)
+	txs, token, err := service.ListTransactionsOfWallet(context.Background(), "user-1", from, to, 20, "token-2", "wallet-1")
+	require.NoError(t, err)
+	assert.Len(t, txs, 1)
+	assert.Equal(t, "tx-3", txs[0].ID)
+	assert.Equal(t, "token-4", token)
+}
+
+func TestEditTransactionRejectsOwnerIDAndNormalizesType(t *testing.T) {
+	service := NewTransactionService(&mockTransactionRepository{})
+
+	err := service.EditTransaction(context.Background(), "user-1", "tx-1", map[string]any{"OwnerID": "user-2"})
+	require.EqualError(t, err, "Owner ID is not updateable")
+
+	err = service.EditTransaction(context.Background(), "user-1", "tx-1", map[string]any{"Type": "income"})
+	require.NoError(t, err)
+}
+
+func TestEditTransactionDelegatesToRepository(t *testing.T) {
+	mock := &mockTransactionRepository{
+		editTransactionFn: func(ctx context.Context, ownerID string, transactionID string, changedFields map[string]any) error {
+			assert.Equal(t, "user-1", ownerID)
+			assert.Equal(t, "tx-1", transactionID)
+			assert.Equal(t, TransactionTypeIncome, changedFields["Type"])
+			return nil
+		},
+	}
+
+	service := NewTransactionService(mock)
+	err := service.EditTransaction(context.Background(), "user-1", "tx-1", map[string]any{"Type": "income"})
+	require.NoError(t, err)
+}
+
+func TestDeleteTransactionDelegatesToRepository(t *testing.T) {
+	mock := &mockTransactionRepository{
+		deleteTransactionFn: func(ctx context.Context, ownerID string, transactionID string) error {
+			assert.Equal(t, "user-1", ownerID)
+			assert.Equal(t, "tx-1", transactionID)
+			return nil
+		},
+	}
+
+	service := NewTransactionService(mock)
+	err := service.DeleteTransaction(context.Background(), "user-1", "tx-1")
+	require.NoError(t, err)
 }

@@ -21,7 +21,7 @@ type TransactionRepository interface {
 	GetTransaction(ctx context.Context, ownerID string, transactionID string) (*Transaction, error)
 	EditTransaction(ctx context.Context, ownerID string, transactionID string, changedFields map[string]any) error
 	DeleteTransaction(ctx context.Context, ownerID string, transactionID string) error
-	ListTransactionsOfSubModel(ctx context.Context, subModelName string, targetID string, ownerID string, fromDate time.Time, toDate time.Time, paginationToken string, limit int32) ([]Transaction, string, error)
+	ListTransactionsOfSubModel(ctx context.Context, subModelName string, targetID string, ownerID string, fromDate time.Time, toDate time.Time, nextToken string, limit int32) ([]Transaction, string, error)
 }
 
 type transactionRepository struct {
@@ -110,7 +110,7 @@ func (repository *transactionRepository) DeleteTransaction(ctx context.Context, 
 }
 
 // ListByGSI lists transactions using the provided GSI name and partition key prefix.
-func (repository *transactionRepository) ListTransactionsOfSubModel(ctx context.Context, subModelName string, targetID string, ownerID string, fromDate time.Time, toDate time.Time, paginationToken string, limit int32) ([]Transaction, string, error) {
+func (repository *transactionRepository) ListTransactionsOfSubModel(ctx context.Context, subModelName string, targetID string, ownerID string, fromDate time.Time, toDate time.Time, nextToken string, limit int32) ([]Transaction, string, error) {
 	// Getting partition keys based on models
 	indexName, indexPartitionKey, indexSortingKey, err := getIndexPartitionKeyAndSortingKey(subModelName)
 	if err != nil {
@@ -151,7 +151,7 @@ func (repository *transactionRepository) ListTransactionsOfSubModel(ctx context.
 		indexName,
 		"", // no filter
 		limit,
-		paginationToken,
+		nextToken,
 		&transactions,
 	)
 

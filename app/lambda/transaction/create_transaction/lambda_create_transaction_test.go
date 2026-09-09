@@ -38,6 +38,26 @@ func (m *MockTransactionService) GetTransactionsBetweenPeriod(ctx context.Contex
 	return nil, "", nil
 }
 
+func (m *MockTransactionService) ListTransactions(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, nextToken string) ([]transaction.Transaction, string, error) {
+	return nil, "", nil
+}
+
+func (m *MockTransactionService) ListTransactionsOfCategory(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, nextToken string, categoryID string) ([]transaction.Transaction, string, error) {
+	return nil, "", nil
+}
+
+func (m *MockTransactionService) ListTransactionsOfWallet(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, nextToken string, wallet string) ([]transaction.Transaction, string, error) {
+	return nil, "", nil
+}
+
+func (m *MockTransactionService) EditTransaction(ctx context.Context, ownerID string, transactionID string, changedFields map[string]any) error {
+	return nil
+}
+
+func (m *MockTransactionService) DeleteTransaction(ctx context.Context, ownerID string, transactionID string) error {
+	return nil
+}
+
 func TestHandle_ValidPayload(t *testing.T) {
 	payload := createTransactionRequest{
 		WalletID:     "wallet-123",

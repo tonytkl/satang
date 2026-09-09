@@ -29,6 +29,26 @@ func (m *mockTransactionService) GetTransactionsBetweenPeriod(ctx context.Contex
 	return nil, "", nil
 }
 
+func (m *mockTransactionService) ListTransactions(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, nextToken string) ([]transaction.Transaction, string, error) {
+	return nil, "", nil
+}
+
+func (m *mockTransactionService) ListTransactionsOfCategory(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, nextToken string, categoryID string) ([]transaction.Transaction, string, error) {
+	return nil, "", nil
+}
+
+func (m *mockTransactionService) ListTransactionsOfWallet(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, nextToken string, wallet string) ([]transaction.Transaction, string, error) {
+	return nil, "", nil
+}
+
+func (m *mockTransactionService) EditTransaction(ctx context.Context, ownerID string, transactionID string, changedFields map[string]any) error {
+	return nil
+}
+
+func (m *mockTransactionService) DeleteTransaction(ctx context.Context, ownerID string, transactionID string) error {
+	return nil
+}
+
 func TestGetTransactionLambda_Handle(t *testing.T) {
 	sampleTransaction := &transaction.Transaction{
 		ID:           "tx123",

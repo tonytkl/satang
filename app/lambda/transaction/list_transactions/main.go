@@ -93,7 +93,7 @@ func (handler *listTransactionsLambda) Handle(ctx context.Context, request event
 			return utils.JsonResponse(http.StatusBadRequest, errorResponse{Message: err.Error()})
 		}
 	}
-	transactions, nextToken, err := handler.service.GetTransactionsBetweenPeriod(ctx, ownerID, fromDate, toDate, limit, nextTokenQuery)
+	transactions, nextToken, err := handler.service.ListTransactions(ctx, ownerID, fromDate, toDate, limit, nextTokenQuery)
 	if err != nil {
 		return utils.JsonResponse(http.StatusInternalServerError, errorResponse{Message: err.Error()})
 	}

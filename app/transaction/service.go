@@ -103,13 +103,21 @@ func (service *transactionService) ListTransactionsOfCategory(ctx context.Contex
 	if ownerID == "" {
 		return nil, "", errors.New("owner ID is required")
 	}
-	if fromDate.IsZero() {
-		// Default to 7 days backward
-		fromDate = time.Now().AddDate(0, 0, -7)
+	if strings.TrimSpace(categoryID) == "" {
+		return nil, "", errors.New("category ID is required")
 	}
 	if toDate.IsZero() {
-		// Default to today
-		toDate = time.Now()
+		toDate = time.Now().UTC()
+	} else {
+		toDate = toDate.UTC()
+	}
+	if fromDate.IsZero() {
+		fromDate = toDate.AddDate(0, 0, -7)
+	} else {
+		fromDate = fromDate.UTC()
+	}
+	if fromDate.After(toDate) {
+		return nil, "", errors.New("from date must not be after to date")
 	}
 	if limit < 0 {
 		return nil, "", errors.New("limit must be greater than or equal to 0")

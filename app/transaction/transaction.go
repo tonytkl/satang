@@ -60,10 +60,10 @@ func NewTransaction(walletID string, walletName string, categoryID string, categ
 		SK:               "TX#" + id,
 		GSI_ByDatePK:     "USER#" + ownerID,
 		GSI_ByDateSK:     "TX#" + dateStr + "#" + id,
-		GSI_ByCategoryPK: "USER#" + ownerID + "TX_CATEGORY#" + string(categoryID),
+		GSI_ByCategoryPK: "USER#" + ownerID + "#TX_CATEGORY#" + categoryID,
 		GSI_ByCategorySK: "TX#" + dateStr + "#" + id,
-		GSI_ByWalletPK:   "USER#" + ownerID + "TX_WALLET#" + string(walletID),
-		GSI_ByWalletSK:   "TX#" + dateStr + "#" + id,
+		GSI_ByWalletPK:   "USER#" + ownerID + "#TX_WALLET#" + walletID,
+		GSI_ByWalletSK:   "TX#" + dateStr + "#" + id
 		ID:               id,
 		WalletID:         walletID,
 		WalletName:       walletName,

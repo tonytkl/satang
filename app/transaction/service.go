@@ -12,7 +12,11 @@ import (
 type TransactionService interface {
 	CreateTransaction(ctx context.Context, walletID string, walletName string, categoryID string, categoryName string, description string, currency string, imageURL string, txType string, amount float64, date time.Time, ownerID string) error
 	GetTransaction(ctx context.Context, transactionID string, ownerID string) (*Transaction, error)
-	GetTransactionsBetweenPeriod(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, nextToken string) ([]Transaction, string, error)
+	ListTransactions(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, nextToken string) ([]Transaction, string, error)
+	ListTransactionsOfCategory(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, nextToken string, categoryID string) ([]Transaction, string, error)
+	ListTransactionsOfWallet(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, nextToken string, wallet string) ([]Transaction, string, error)
+	EditTransaction(ctx context.Context, ownerID string, transactionID string, changedFields map[string]any) error
+	DeleteTransaction(ctx context.Context, ownerID string, transactionID string) error
 }
 
 type transactionService struct {
@@ -46,7 +50,7 @@ func (service *transactionService) CreateTransaction(ctx context.Context, wallet
 	if err := validateTransaction(transaction); err != nil {
 		return err
 	}
-	if err := service.repository.Create(ctx, transaction); err != nil {
+	if err := service.repository.CreateTransaction(ctx, transaction); err != nil {
 		return err
 	}
 	return nil
@@ -61,15 +65,27 @@ func (service *transactionService) GetTransaction(ctx context.Context, transacti
 		return nil, errors.New("Owner ID is required")
 	}
 
-	return service.repository.GetByKey(ctx, transactionID, ownerID)
+	return service.repository.GetTransaction(ctx, ownerID, transactionID)
 }
 
-func (service *transactionService) GetTransactionsBetweenPeriod(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, nextToken string) ([]Transaction, string, error) {
+func (service *transactionService) ListTransactions(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, nextToken string) ([]Transaction, string, error) {
 	if ownerID == "" {
 		return nil, "", errors.New("owner ID is required")
 	}
-	if fromDate.IsZero() || toDate.IsZero() {
-		return nil, "", errors.New("from date and to date are required")
+	if toDate.IsZero() {
+		// Default to today (UTC)
+		toDate = time.Now().UTC()
+	} else {
+		toDate = toDate.UTC()
+	}
+	if fromDate.IsZero() {
+		// Default to 7 days backward from the end of the range (UTC)
+		fromDate = toDate.AddDate(0, 0, -7)
+	} else {
+		fromDate = fromDate.UTC()
+	}
+	if fromDate.After(toDate) {
+		return nil, "", errors.New("from date must not be after to date")
 	}
 	if limit < 0 {
 		return nil, "", errors.New("limit must be greater than or equal to 0")
@@ -80,7 +96,105 @@ func (service *transactionService) GetTransactionsBetweenPeriod(ctx context.Cont
 		limit = utils.DEFAULT_PAGINATION_SIZE
 	}
 
-	return service.repository.ListWithinDateRange(ctx, ownerID, fromDate, toDate, limit, nextToken)
+	return service.repository.ListTransactionsOfSubModel(ctx, "date", "", ownerID, fromDate, toDate, nextToken, limit)
+}
+
+func (service *transactionService) ListTransactionsOfCategory(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, nextToken string, categoryID string) ([]Transaction, string, error) {
+	if ownerID == "" {
+		return nil, "", errors.New("owner ID is required")
+	}
+	if strings.TrimSpace(categoryID) == "" {
+		return nil, "", errors.New("category ID is required")
+	}
+	if toDate.IsZero() {
+		toDate = time.Now().UTC()
+	} else {
+		toDate = toDate.UTC()
+	}
+	if fromDate.IsZero() {
+		fromDate = toDate.AddDate(0, 0, -7)
+	} else {
+		fromDate = fromDate.UTC()
+	}
+	if fromDate.After(toDate) {
+		return nil, "", errors.New("from date must not be after to date")
+	}
+	if limit < 0 {
+		return nil, "", errors.New("limit must be greater than or equal to 0")
+	}
+
+	// Default pagination size if not set
+	if limit == 0 {
+		limit = utils.DEFAULT_PAGINATION_SIZE
+	}
+
+	return service.repository.ListTransactionsOfSubModel(ctx, "category", categoryID, ownerID, fromDate, toDate, nextToken, limit)
+}
+
+func (service *transactionService) ListTransactionsOfWallet(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, nextToken string, walletID string) ([]Transaction, string, error) {
+	if ownerID == "" {
+		return nil, "", errors.New("owner ID is required")
+	}
+	if strings.TrimSpace(walletID) == "" {
+		return nil, "", errors.New("wallet ID is required")
+	}
+	if toDate.IsZero() {
+		toDate = time.Now().UTC()
+	} else {
+		toDate = toDate.UTC()
+	}
+	if fromDate.IsZero() {
+		fromDate = toDate.AddDate(0, 0, -7)
+	} else {
+		fromDate = fromDate.UTC()
+	}
+	if fromDate.After(toDate) {
+		return nil, "", errors.New("from date must not be after to date")
+	}
+	if limit < 0 {
+		return nil, "", errors.New("limit must be greater than or equal to 0")
+	}
+
+	// Default pagination size if not set
+	if limit == 0 {
+		limit = utils.DEFAULT_PAGINATION_SIZE
+	}
+
+	return service.repository.ListTransactionsOfSubModel(ctx, "wallet", walletID, ownerID, fromDate, toDate, nextToken, limit)
+}
+
+func (service *transactionService) EditTransaction(ctx context.Context, ownerID string, transactionID string, changedFields map[string]any) error {
+	if changedFields == nil {
+		return errors.New("Update payload is required")
+	}
+
+	normalizedFields := make(map[string]any, len(changedFields))
+	for key, value := range changedFields {
+		normalizedFields[key] = value
+	}
+
+	if _, ok := normalizedFields["OwnerID"]; ok {
+		return errors.New("Owner ID is not updateable")
+	}
+
+	if typeValue, ok := normalizedFields["Type"]; ok {
+		strTransactionType, ok := typeValue.(string)
+		if !ok {
+			return errors.New("Type must be a string")
+		}
+
+		categoryType, err := getTransactionType(strTransactionType)
+		if err != nil {
+			return err
+		}
+		normalizedFields["Type"] = categoryType
+	}
+
+	return service.repository.EditTransaction(ctx, ownerID, transactionID, normalizedFields)
+}
+
+func (service *transactionService) DeleteTransaction(ctx context.Context, ownerID string, transactionID string) error {
+	return service.repository.DeleteTransaction(ctx, ownerID, transactionID)
 }
 
 func getTransactionType(txType string) (TransactionType, error) {

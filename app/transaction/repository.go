@@ -4,9 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/tonytkl/satang/clients"
+	"github.com/tonytkl/satang/repository"
 	"github.com/tonytkl/satang/utils"
 )
 
@@ -15,48 +17,50 @@ var ErrTransactionNotFound = errors.New("transaction not found")
 
 // TransactionRepository defines persistence operations for transactions.
 type TransactionRepository interface {
-	Create(ctx context.Context, transaction *Transaction) error
-	ListByGSI(ctx context.Context, indexName string, indexPartitionKeyPrefix string, targetID string, ownerID string, fromDate *time.Time, toDate *time.Time) ([]Transaction, error)
-	ListWithinDateRange(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, nextToken string) ([]Transaction, string, error)
-	GetByKey(ctx context.Context, id string, ownerID string) (*Transaction, error)
-	Update(ctx context.Context, ownerID string, transactionDate string, transactionID string, transaction *Transaction) error
-	Delete(ctx context.Context, ownerID string, transactionDate string, transactionID string) error
+	CreateTransaction(ctx context.Context, transaction *Transaction) error
+	GetTransaction(ctx context.Context, ownerID string, transactionID string) (*Transaction, error)
+	EditTransaction(ctx context.Context, ownerID string, transactionID string, changedFields map[string]any) error
+	DeleteTransaction(ctx context.Context, ownerID string, transactionID string) error
+	ListTransactionsOfSubModel(ctx context.Context, subModelName string, targetID string, ownerID string, fromDate time.Time, toDate time.Time, nextToken string, limit int32) ([]Transaction, string, error)
 }
 
 type transactionRepository struct {
-	db        clients.DynamoDBClient
-	tableName string
+	db             clients.DynamoDBClient
+	tableName      string
+	baseRepository repository.BaseRepository[*Transaction]
 }
 
 // NewTransactionRepository creates a transaction repository backed by DynamoDB.
 func NewTransactionRepository(db clients.DynamoDBClient, tableName string) TransactionRepository {
 	return &transactionRepository{
-		db:        db,
-		tableName: tableName,
+		db:             db,
+		tableName:      tableName,
+		baseRepository: repository.NewBaseRepository(db, tableName, "TX", func() *Transaction { return &Transaction{} }),
 	}
 }
 
 // Create stores a transaction and populates its derived keys and timestamps.
-func (repository *transactionRepository) Create(ctx context.Context, transaction *Transaction) error {
-	sortingKey := utils.GetSortingKey("TX", transaction.Date, transaction.ID)
+// Not using base repository because of GSIs
+func (repository *transactionRepository) CreateTransaction(ctx context.Context, transaction *Transaction) error {
+	sortingKey := utils.GetPartitionKeyWithDate("TX", transaction.Date, transaction.ID)
 
 	transaction.PK = utils.GetPartitionKey("USER", transaction.OwnerID)
-	transaction.SK = sortingKey
+	transaction.SK = utils.GetPartitionKey("TX", transaction.ID)
 
-	transaction.GSI_ByCategoryPK = utils.GetPartitionKey("TX_CATEGORY", transaction.CategoryID)
+	transaction.GSI_ByDatePK = utils.GetPartitionKey("USER", transaction.OwnerID)
+	transaction.GSI_ByDateSK = sortingKey
+
+	transaction.GSI_ByCategoryPK = utils.GetPartitionKeySubModel("USER", transaction.OwnerID, "TX_CATEGORY", transaction.CategoryID)
 	transaction.GSI_ByCategorySK = sortingKey
 
-	transaction.GSI_ByWalletPK = utils.GetPartitionKey("TX_WALLET", transaction.WalletID)
+	transaction.GSI_ByWalletPK = utils.GetPartitionKeySubModel("USER", transaction.OwnerID, "TX_WALLET", transaction.WalletID)
 	transaction.GSI_ByWalletSK = sortingKey
 
-	transaction.GSI_ByTransactionID = "TX_ID#" + transaction.ID
-	transaction.GSI_ByTransactionSK = sortingKey
-
 	if transaction.CreatedAt.IsZero() {
-		transaction.CreatedAt = time.Now().UTC()
+		transaction.SetCreatedAt(time.Now().UTC())
 	}
 	if transaction.UpdatedAt.IsZero() {
-		transaction.UpdatedAt = transaction.CreatedAt
+		transaction.SetUpdatedAt(transaction.CreatedAt)
 	}
 
 	err := repository.db.PutItem(ctx, repository.tableName, transaction)
@@ -67,228 +71,107 @@ func (repository *transactionRepository) Create(ctx context.Context, transaction
 	return nil
 }
 
+func (repository *transactionRepository) GetTransaction(ctx context.Context, ownerID string, transactionID string) (*Transaction, error) {
+	return repository.baseRepository.Get(ctx, ownerID, transactionID)
+}
+
+func (repository *transactionRepository) EditTransaction(ctx context.Context, ownerID string, transactionID string, changedFields map[string]any) error {
+	updatedFields := make(map[string]any, len(changedFields)+5)
+	for key, value := range changedFields {
+		updatedFields[key] = value
+	}
+
+	if walletID, ok := updatedFields["WalletID"].(string); ok {
+		updatedFields["GSI_ByWalletPK"] = utils.GetPartitionKeySubModel("USER", ownerID, "TX_WALLET", walletID)
+	}
+
+	if categoryID, ok := updatedFields["CategoryID"].(string); ok {
+		updatedFields["GSI_ByCategoryPK"] = utils.GetPartitionKeySubModel("USER", ownerID, "TX_CATEGORY", categoryID)
+	}
+
+	dateValue, hasDate := updatedFields["Date"]
+	if hasDate {
+		transactionDate, ok := dateValue.(time.Time)
+		if !ok {
+			return errors.New("Date must be time.Time")
+		}
+
+		sortingKey := utils.GetPartitionKeyWithDate("TX", transactionDate, transactionID)
+		updatedFields["GSI_ByDateSK"] = sortingKey
+		updatedFields["GSI_ByCategorySK"] = sortingKey
+		updatedFields["GSI_ByWalletSK"] = sortingKey
+	}
+
+	return repository.baseRepository.Update(ctx, ownerID, transactionID, updatedFields)
+}
+
+func (repository *transactionRepository) DeleteTransaction(ctx context.Context, ownerID string, transactionID string) error {
+	return repository.baseRepository.Delete(ctx, ownerID, transactionID)
+}
+
 // ListByGSI lists transactions using the provided GSI name and partition key prefix.
-func (repository *transactionRepository) ListByGSI(ctx context.Context, indexName string, indexPartitionKeyPrefix string, targetID string, ownerID string, fromDate *time.Time, toDate *time.Time) ([]Transaction, error) {
-	if targetID == "" || indexName == "" || indexPartitionKeyPrefix == "" {
-		return nil, errors.New("index name, index partition key prefix, and target ID are required")
-	}
-
-	indexPartitionKeyField, err := getIndexPartitionKeyField(indexName)
+func (repository *transactionRepository) ListTransactionsOfSubModel(ctx context.Context, subModelName string, targetID string, ownerID string, fromDate time.Time, toDate time.Time, nextToken string, limit int32) ([]Transaction, string, error) {
+	// Getting partition keys based on models
+	indexName, indexPartitionKey, indexSortingKey, err := getIndexPartitionKeyAndSortingKey(subModelName)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
-	queryExpression := indexPartitionKeyField + " = :indexPK"
-	expressionValues := map[string]any{
-		":indexPK": utils.GetPartitionKey(indexPartitionKeyPrefix, targetID),
+	// Forming datetime config
+	if fromDate.After(toDate) {
+		return nil, "", errors.New("from date must not be after to date")
 	}
-	filterExpression := ""
-	if ownerID != "" {
-		expressionValues[":ownerPK"] = utils.GetPartitionKey("USER", ownerID)
-		filterExpression = "PK = :ownerPK"
-	}
+	fromSK := utils.GetPartitionKeyWithDate("TX", fromDate, "")
+	toSK := utils.GetPartitionKeyWithDate("TX", toDate, "")
 
-	if fromDate != nil && toDate != nil {
-		if fromDate.After(*toDate) {
-			return nil, errors.New("from date must not be after to date")
+	// Forming query expression
+	queryExpression := indexPartitionKey + " = :indexPK AND " + indexSortingKey + " BETWEEN :from AND :to"
+	var expressionValues map[string]any
+	if strings.ToUpper(subModelName) == "DATE" {
+		expressionValues = map[string]any{
+			":indexPK": utils.GetPartitionKey("USER", ownerID),
+			":from":    fromSK,
+			":to":      toSK,
 		}
-
-		indexSortKeyField, err := getIndexSortKeyField(indexName)
-		if err != nil {
-			return nil, err
+	} else {
+		expressionValues = map[string]any{
+			":indexPK": utils.GetPartitionKeySubModel("USER", ownerID, "TX_"+strings.ToUpper(subModelName), targetID),
+			":from":    fromSK,
+			":to":      toSK,
 		}
-
-		queryExpression += " AND " + indexSortKeyField + " BETWEEN :from AND :to"
-		expressionValues[":from"] = utils.GetSortingKey("TX", *fromDate, "")
-		expressionValues[":to"] = utils.GetSortingKey("TX", *toDate, "")
 	}
 
 	transactions := []Transaction{}
 
-	err = repository.db.QueryItems(
+	encodedNextToken, err := repository.db.QueryItemsWithPagination(
 		ctx,
 		repository.tableName,
 		queryExpression,
 		expressionValues,
 		indexName,
-		filterExpression,
-		&transactions,
-	)
-
-	if err != nil {
-		return nil, fmt.Errorf("query transaction by ID: %w", err)
-	}
-
-	return transactions, nil
-}
-
-// ListWithinDateRange lists transactions for a user within a date range.
-func (repository *transactionRepository) ListWithinDateRange(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, nextToken string) ([]Transaction, string, error) {
-	if fromDate.After(toDate) {
-		return nil, "", errors.New("from date must not be after to date")
-	}
-
-	fromSK := utils.GetSortingKey("TX", fromDate, "")
-	toSK := utils.GetSortingKey("TX", toDate, "")
-
-	transactions := []Transaction{}
-	encodedNextToken, err := repository.db.QueryItemsWithPagination(
-		ctx,
-		repository.tableName,
-		"PK = :pk AND SK BETWEEN :from AND :to",
-		map[string]any{
-			":pk":   utils.GetPartitionKey("USER", ownerID),
-			":from": fromSK,
-			":to":   toSK,
-		},
-		"",
-		"",
+		"", // no filter
 		limit,
 		nextToken,
 		&transactions,
 	)
+
 	if err != nil {
-		return nil, "", fmt.Errorf("list transactions within date range: %w", err)
+		return nil, "", fmt.Errorf("query transaction by ID: %w", err)
 	}
 
 	return transactions, encodedNextToken, nil
 }
 
-func (repository *transactionRepository) GetByKey(ctx context.Context, id string, ownerID string) (*Transaction, error) {
-	transactions, err := repository.ListByGSI(ctx, "GSI3", "TX_ID", id, ownerID, nil, nil)
-
-	if err != nil {
-		return nil, err
-	}
-
-	if len(transactions) == 0 {
-		return nil, ErrTransactionNotFound
-	}
-
-	return &transactions[0], nil
-}
-
-// Update modifies mutable attributes of an existing transaction.
-func (repository *transactionRepository) Update(ctx context.Context, ownerID string, transactionDate string, transactionID string, transaction *Transaction) error {
-	if ownerID == "" {
-		return errors.New("owner ID is required")
-	}
-	if transactionDate == "" {
-		return errors.New("transaction date is required")
-	}
-	if transactionID == "" {
-		return errors.New("transaction ID is required")
-	}
-	if transaction == nil {
-		return errors.New("transaction is required")
-	}
-
-	date, err := time.Parse("2006-01-02", transactionDate)
-	if err != nil {
-		return fmt.Errorf("invalid transaction date format: %w", err)
-	}
-
-	sortingKey := utils.GetSortingKey("TX", date, transactionID)
-	updatedAt := time.Now().UTC()
-
-	key := map[string]any{
-		"PK": utils.GetPartitionKey("USER", ownerID),
-		"SK": sortingKey,
-	}
-
-	updateExpression := "SET #WalletID = :walletID, #WalletName = :walletName, #Amount = :amount, #Currency = :currency, #CategoryID = :categoryID, #CategoryName = :categoryName, #Description = :description, #ImageURL = :imageURL, #GSI_PK = :gsiCategoryPK, #GSI2_PK = :gsiWalletPK, #UpdatedAt = :updatedAt"
-
-	expressionNames := map[string]string{
-		"#WalletID":    "WalletID",
-		"#WalletName":  "WalletName",
-		"#Amount":      "Amount",
-		"#Currency":    "Currency",
-		"#CategoryID":  "CategoryID",
-		"#CategoryName": "CategoryName",
-		"#Description": "Description",
-		"#ImageURL":    "ImageURL",
-		"#GSI_PK":      "GSI_PK",
-		"#GSI2_PK":     "GSI2_PK",
-		"#UpdatedAt":   "UpdatedAt",
-	}
-
-	expressionValues := map[string]any{
-		":walletID":      transaction.WalletID,
-		":walletName":    transaction.WalletName,
-		":amount":        transaction.Amount,
-		":currency":      transaction.Currency,
-		":categoryID":    transaction.CategoryID,
-		":categoryName":  transaction.CategoryName,
-		":description":   transaction.Description,
-		":imageURL":      transaction.ImageURL,
-		":gsiCategoryPK": utils.GetPartitionKey("TX_CATEGORY", transaction.CategoryID),
-		":gsiWalletPK":   utils.GetPartitionKey("TX_WALLET", transaction.WalletID),
-		":updatedAt":     updatedAt,
-		":transactionID": transactionID,
-	}
-
-	conditionExpression := "attribute_exists(PK) AND attribute_exists(SK) AND ID = :transactionID"
-
-	if err := repository.db.UpdateItem(ctx, repository.tableName, key, updateExpression, expressionValues, expressionNames, conditionExpression); err != nil {
-		return fmt.Errorf("update transaction: %w", err)
-	}
-
-	return nil
-}
-
-// Delete removes an existing transaction.
-func (repository *transactionRepository) Delete(ctx context.Context, ownerID string, transactionDate string, transactionID string) error {
-	if ownerID == "" {
-		return errors.New("owner ID is required")
-	}
-	if transactionDate == "" {
-		return errors.New("transaction date is required")
-	}
-	if transactionID == "" {
-		return errors.New("transaction ID is required")
-	}
-
-	date, err := time.Parse("2006-01-02", transactionDate)
-	if err != nil {
-		return fmt.Errorf("invalid transaction date format: %w", err)
-	}
-	sortingKey := utils.GetSortingKey("TX", date, transactionID)
-
-	key := map[string]any{
-		"PK": "USER#" + ownerID,
-		"SK": sortingKey,
-	}
-
-	if err := repository.db.DeleteItem(ctx, repository.tableName, key); err != nil {
-		return fmt.Errorf("delete transaction: %w", err)
-	}
-	return nil
-}
-
-// getIndexPartitionKeyField resolves a GSI name to its partition key attribute.
-func getIndexPartitionKeyField(indexName string) (string, error) {
-	switch indexName {
-	case "GSI1":
-		return "GSI_PK", nil
-	case "GSI2":
-		return "GSI2_PK", nil
-	case "GSI3":
-		return "GSI3_PK", nil
+// getIndexPartitionKeyAndSortingKey resolves a submodel name to its DynamoDB GSI name and key attributes.
+func getIndexPartitionKeyAndSortingKey(model string) (string, string, string, error) {
+	switch model {
+	case "date":
+		return "GSI1", "GSI1_PK", "GSI1_SK", nil
+	case "wallet":
+		return "GSI2", "GSI2_PK", "GSI2_SK", nil
+	case "category":
+		return "GSI3", "GSI3_PK", "GSI3_SK", nil
 	default:
-		return "", fmt.Errorf("unsupported index name: %s", indexName)
-	}
-}
-
-// getIndexSortKeyField resolves a GSI name to its sort key attribute.
-func getIndexSortKeyField(indexName string) (string, error) {
-	switch indexName {
-	case "GSI1":
-		return "GSI_SK", nil
-	case "GSI2":
-		return "GSI2_SK", nil
-	case "GSI3":
-		return "GSI3_SK", nil
-	default:
-		return "", fmt.Errorf("unsupported index name: %s", indexName)
+		return "", "", "", fmt.Errorf("unsupported model name: %s", model)
 	}
 }

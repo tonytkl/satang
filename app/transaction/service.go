@@ -156,11 +156,20 @@ func (service *transactionService) ListTransactionsOfWallet(ctx context.Context,
 }
 
 func (service *transactionService) EditTransaction(ctx context.Context, ownerID string, transactionID string, changedFields map[string]any) error {
-	if _, ok := changedFields["OwnerID"]; ok {
+	if changedFields == nil {
+		return errors.New("Update payload is required")
+	}
+
+	normalizedFields := make(map[string]any, len(changedFields))
+	for key, value := range changedFields {
+		normalizedFields[key] = value
+	}
+
+	if _, ok := normalizedFields["OwnerID"]; ok {
 		return errors.New("Owner ID is not updateable")
 	}
 
-	if typeValue, ok := changedFields["Type"]; ok {
+	if typeValue, ok := normalizedFields["Type"]; ok {
 		strTransactionType, ok := typeValue.(string)
 		if !ok {
 			return errors.New("Type must be a string")
@@ -170,10 +179,10 @@ func (service *transactionService) EditTransaction(ctx context.Context, ownerID 
 		if err != nil {
 			return err
 		}
-		changedFields["Type"] = categoryType
+		normalizedFields["Type"] = categoryType
 	}
 
-	return service.repository.EditTransaction(ctx, ownerID, transactionID, changedFields)
+	return service.repository.EditTransaction(ctx, ownerID, transactionID, normalizedFields)
 }
 
 func (service *transactionService) DeleteTransaction(ctx context.Context, ownerID string, transactionID string) error {

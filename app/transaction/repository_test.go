@@ -116,7 +116,7 @@ func TestTransactionRepositoryCreateSuccess(t *testing.T) {
 		},
 	}
 
-	repo := NewTransactionRepository(mock, "transactions")
+	repo := NewRepository(mock, "transactions")
 	tx := &Transaction{
 		ID:         "tx-1",
 		OwnerID:    "user-1",
@@ -146,7 +146,7 @@ func TestTransactionRepositoryGetTransactionSuccess(t *testing.T) {
 		},
 	}
 
-	repo := NewTransactionRepository(mock, "transactions")
+	repo := NewRepository(mock, "transactions")
 
 	got, err := repo.GetTransaction(context.Background(), "user-1", "tx-1")
 	require.NoError(t, err)
@@ -156,7 +156,7 @@ func TestTransactionRepositoryGetTransactionSuccess(t *testing.T) {
 }
 
 func TestTransactionRepositoryGetTransactionErrors(t *testing.T) {
-	repo := NewTransactionRepository(&mockDynamoDB{}, "transactions")
+	repo := NewRepository(&mockDynamoDB{}, "transactions")
 
 	_, err := repo.GetTransaction(context.Background(), "", "tx-1")
 	require.EqualError(t, err, "owner ID is required")
@@ -184,7 +184,7 @@ func TestTransactionRepositoryListTransactionsOfSubModelDateSuccess(t *testing.T
 		},
 	}
 
-	repo := NewTransactionRepository(mock, "transactions")
+	repo := NewRepository(mock, "transactions")
 	from := time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC)
 	to := time.Date(2026, 4, 30, 0, 0, 0, 0, time.UTC)
 
@@ -212,7 +212,7 @@ func TestTransactionRepositoryListTransactionsOfSubModelCategorySuccess(t *testi
 		},
 	}
 
-	repo := NewTransactionRepository(mock, "transactions")
+	repo := NewRepository(mock, "transactions")
 	from := time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC)
 	to := time.Date(2026, 4, 30, 0, 0, 0, 0, time.UTC)
 
@@ -223,7 +223,7 @@ func TestTransactionRepositoryListTransactionsOfSubModelCategorySuccess(t *testi
 }
 
 func TestTransactionRepositoryListTransactionsOfSubModelErrors(t *testing.T) {
-	repo := NewTransactionRepository(&mockDynamoDB{}, "transactions")
+	repo := NewRepository(&mockDynamoDB{}, "transactions")
 	from := time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC)
 	to := time.Date(2026, 4, 30, 0, 0, 0, 0, time.UTC)
 
@@ -276,7 +276,7 @@ func TestTransactionRepositoryEditTransactionSuccess(t *testing.T) {
 		},
 	}
 
-	repo := NewTransactionRepository(mock, "transactions")
+	repo := NewRepository(mock, "transactions")
 	err := repo.EditTransaction(context.Background(), "user-1", "tx-1", map[string]any{
 		"WalletID":    "wallet-2",
 		"CategoryID":  "cat-2",
@@ -287,7 +287,7 @@ func TestTransactionRepositoryEditTransactionSuccess(t *testing.T) {
 }
 
 func TestTransactionRepositoryEditTransactionDateTypeError(t *testing.T) {
-	repo := NewTransactionRepository(&mockDynamoDB{}, "transactions")
+	repo := NewRepository(&mockDynamoDB{}, "transactions")
 
 	err := repo.EditTransaction(context.Background(), "user-1", "tx-1", map[string]any{
 		"Date": "2026-04-20",
@@ -305,13 +305,13 @@ func TestTransactionRepositoryDeleteSuccess(t *testing.T) {
 		},
 	}
 
-	repo := NewTransactionRepository(mock, "transactions")
+	repo := NewRepository(mock, "transactions")
 	err := repo.DeleteTransaction(context.Background(), "user-1", "tx-1")
 	require.NoError(t, err)
 }
 
 func TestTransactionRepositoryEditAndDeleteErrorPaths(t *testing.T) {
-	repo := NewTransactionRepository(&mockDynamoDB{}, "transactions")
+	repo := NewRepository(&mockDynamoDB{}, "transactions")
 
 	err := repo.EditTransaction(context.Background(), "", "tx-1", map[string]any{"WalletID": "wallet-1"})
 	require.EqualError(t, err, "owner ID is required")
@@ -338,7 +338,7 @@ func TestTransactionRepositoryDBErrorWrapping(t *testing.T) {
 		},
 	}
 
-	repo := NewTransactionRepository(mock, "transactions")
+	repo := NewRepository(mock, "transactions")
 	from := time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC)
 	to := time.Date(2026, 4, 30, 0, 0, 0, 0, time.UTC)
 

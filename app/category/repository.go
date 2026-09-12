@@ -7,7 +7,7 @@ import (
 	"github.com/tonytkl/satang/repository"
 )
 
-type CategoryRepository interface {
+type Repository interface {
 	CreateCategory(ctx context.Context, category *Category) error
 	ListCategories(ctx context.Context, ownerID string, nextToken string, limit int32) ([]*Category, string, error)
 	GetCategory(ctx context.Context, ownerID string, categoryID string) (*Category, error)
@@ -21,7 +21,7 @@ type categoryRepository struct {
 	baseRepository repository.BaseRepository[*Category]
 }
 
-func NewCategoryRepository(db clients.DynamoDBClient, tableName string) CategoryRepository {
+func NewRepository(db clients.DynamoDBClient, tableName string) Repository {
 	return &categoryRepository{
 		db:             db,
 		tableName:      tableName,

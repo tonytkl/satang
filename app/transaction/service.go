@@ -9,7 +9,7 @@ import (
 	"github.com/tonytkl/satang/utils"
 )
 
-type TransactionService interface {
+type Service interface {
 	CreateTransaction(ctx context.Context, walletID string, walletName string, categoryID string, categoryName string, description string, currency string, imageURL string, txType string, amount float64, date time.Time, ownerID string) error
 	GetTransaction(ctx context.Context, transactionID string, ownerID string) (*Transaction, error)
 	ListTransactions(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, nextToken string) ([]Transaction, string, error)
@@ -20,10 +20,10 @@ type TransactionService interface {
 }
 
 type transactionService struct {
-	repository TransactionRepository
+	repository Repository
 }
 
-func NewTransactionService(repository TransactionRepository) TransactionService {
+func NewService(repository Repository) Service {
 	return &transactionService{
 		repository: repository,
 	}

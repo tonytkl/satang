@@ -3,42 +3,45 @@ resource "aws_apigatewayv2_api" "satang_api" {
   protocol_type = "HTTP"
 }
 
-module "api_route_create_transaction" {
+locals {
+  api_routes = {
+    create_transaction = {
+      method                  = "POST"
+      path                    = "/api/v1.0/transactions"
+      integration_uri         = module.lambda_create_transaction.create_transaction_invoke_arn
+      lambda_function_name    = module.lambda_create_transaction.create_transaction_function_name
+      permission_statement_id = "AllowExecutionFromAPIGatewayCreateTransaction"
+    }
+    get_transaction = {
+      method                  = "GET"
+      path                    = "/api/v1.0/transactions/{transaction_id}"
+      integration_uri         = module.lambda_get_transaction.get_transaction_invoke_arn
+      lambda_function_name    = module.lambda_get_transaction.get_transaction_function_name
+      permission_statement_id = "AllowExecutionFromAPIGatewayGetTransaction"
+    }
+    list_transactions = {
+      method                  = "GET"
+      path                    = "/api/v1.0/transactions"
+      integration_uri         = module.lambda_list_transactions.list_transactions_invoke_arn
+      lambda_function_name    = module.lambda_list_transactions.list_transactions_function_name
+      permission_statement_id = "AllowExecutionFromAPIGatewayListTransactions"
+    }
+  }
+}
+
+module "api_routes" {
+  for_each = local.api_routes
+
   source = "./api_route/create_transaction"
 
   api_id                         = aws_apigatewayv2_api.satang_api.id
   api_execution_arn              = aws_apigatewayv2_api.satang_api.execution_arn
-  integration_uri                = module.lambda_create_transaction.create_transaction_invoke_arn
-  integration_method             = "POST"
-  route_key                      = "POST /api/v1.0/transactions"
-  lambda_function_name           = module.lambda_create_transaction.create_transaction_function_name
-  lambda_permission_statement_id = "AllowExecutionFromAPIGatewayCreateTransaction"
+  integration_uri                = each.value.integration_uri
+  integration_method             = each.value.method
+  route_key                      = "${each.value.method} ${each.value.path}"
+  lambda_function_name           = each.value.lambda_function_name
+  lambda_permission_statement_id = each.value.permission_statement_id
 }
-
-module "api_route_get_transaction" {
-  source = "./api_route/get_transaction"
-
-  api_id                         = aws_apigatewayv2_api.satang_api.id
-  api_execution_arn              = aws_apigatewayv2_api.satang_api.execution_arn
-  integration_uri                = module.lambda_get_transaction.get_transaction_invoke_arn
-  integration_method             = "GET"
-  route_key                      = "GET /api/v1.0/transactions/{transaction_id}"
-  lambda_function_name           = module.lambda_get_transaction.get_transaction_function_name
-  lambda_permission_statement_id = "AllowExecutionFromAPIGatewayGetTransaction"
-}
-
-module "api_route_list_transactions" {
-  source = "./api_route/list_transactions"
-
-  api_id                         = aws_apigatewayv2_api.satang_api.id
-  api_execution_arn              = aws_apigatewayv2_api.satang_api.execution_arn
-  integration_uri                = module.lambda_list_transactions.list_transactions_invoke_arn
-  integration_method             = "GET"
-  route_key                      = "GET /api/v1.0/transactions"
-  lambda_function_name           = module.lambda_list_transactions.list_transactions_function_name
-  lambda_permission_statement_id = "AllowExecutionFromAPIGatewayListTransactions"
-}
-
 
 resource "aws_apigatewayv2_stage" "default" {
   api_id      = aws_apigatewayv2_api.satang_api.id

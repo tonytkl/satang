@@ -32,12 +32,12 @@ locals {
 module "api_routes" {
   for_each = local.api_routes
 
-  source = "./api_route/create_transaction"
+  source = "./api_route/http_route"
 
   api_id                         = aws_apigatewayv2_api.satang_api.id
   api_execution_arn              = aws_apigatewayv2_api.satang_api.execution_arn
   integration_uri                = each.value.integration_uri
-  integration_method             = each.value.method
+  integration_method             = "POST"
   route_key                      = "${each.value.method} ${each.value.path}"
   lambda_function_name           = each.value.lambda_function_name
   lambda_permission_statement_id = each.value.permission_statement_id

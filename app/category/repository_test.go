@@ -82,7 +82,7 @@ func TestCategoryRepositoryCreateCategory(t *testing.T) {
 		},
 	}
 
-	repo := NewCategoryRepository(db, "categories")
+	repo := NewRepository(db, "categories")
 	err := repo.CreateCategory(context.Background(), &Category{ID: "category-1", OwnerID: "owner-1", Name: "Food"})
 	require.NoError(t, err)
 }
@@ -104,7 +104,7 @@ func TestCategoryRepositoryListCategories(t *testing.T) {
 		},
 	}
 
-	repo := NewCategoryRepository(db, "categories")
+	repo := NewRepository(db, "categories")
 	got, nextToken, err := repo.ListCategories(context.Background(), "owner-1", "tok-1", 5)
 	require.NoError(t, err)
 	require.Len(t, got, 1)
@@ -128,7 +128,7 @@ func TestCategoryRepositoryGetCategory(t *testing.T) {
 		},
 	}
 
-	repo := NewCategoryRepository(db, "categories")
+	repo := NewRepository(db, "categories")
 	got, err := repo.GetCategory(context.Background(), "owner-1", "category-1")
 	require.NoError(t, err)
 	require.NotNil(t, got)
@@ -148,7 +148,7 @@ func TestCategoryRepositoryEditCategory(t *testing.T) {
 		},
 	}
 
-	repo := NewCategoryRepository(db, "categories")
+	repo := NewRepository(db, "categories")
 	err := repo.EditCategory(context.Background(), "owner-1", "category-1", map[string]any{"Name": "Travel"})
 	require.NoError(t, err)
 }
@@ -163,7 +163,7 @@ func TestCategoryRepositoryDeleteCategory(t *testing.T) {
 		},
 	}
 
-	repo := NewCategoryRepository(db, "categories")
+	repo := NewRepository(db, "categories")
 	err := repo.DeleteCategory(context.Background(), "owner-1", "category-1")
 	require.NoError(t, err)
 }

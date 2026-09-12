@@ -82,7 +82,7 @@ func TestWalletRepositoryCreateWallet(t *testing.T) {
 		},
 	}
 
-	repo := NewWalletRepository(db, "wallets")
+	repo := NewRepository(db, "wallets")
 	err := repo.CreateWallet(context.Background(), &Wallet{ID: "wallet-1", OwnerID: "owner-1", Name: "Cash"})
 	require.NoError(t, err)
 }
@@ -104,7 +104,7 @@ func TestWalletRepositoryListWallets(t *testing.T) {
 		},
 	}
 
-	repo := NewWalletRepository(db, "wallets")
+	repo := NewRepository(db, "wallets")
 	got, nextToken, err := repo.ListWallets(context.Background(), "owner-1", "tok-1", 10)
 	require.NoError(t, err)
 	require.Len(t, got, 1)
@@ -128,7 +128,7 @@ func TestWalletRepositoryGetWallet(t *testing.T) {
 		},
 	}
 
-	repo := NewWalletRepository(db, "wallets")
+	repo := NewRepository(db, "wallets")
 	got, err := repo.GetWallet(context.Background(), "owner-1", "wallet-1")
 	require.NoError(t, err)
 	require.NotNil(t, got)
@@ -148,7 +148,7 @@ func TestWalletRepositoryEditWallet(t *testing.T) {
 		},
 	}
 
-	repo := NewWalletRepository(db, "wallets")
+	repo := NewRepository(db, "wallets")
 	err := repo.EditWallet(context.Background(), "owner-1", "wallet-1", map[string]any{"Name": "Updated"})
 	require.NoError(t, err)
 }
@@ -163,7 +163,7 @@ func TestWalletRepositoryDeleteWallet(t *testing.T) {
 		},
 	}
 
-	repo := NewWalletRepository(db, "wallets")
+	repo := NewRepository(db, "wallets")
 	err := repo.DeleteWallet(context.Background(), "owner-1", "wallet-1")
 	require.NoError(t, err)
 }

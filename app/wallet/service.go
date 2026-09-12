@@ -19,11 +19,11 @@ type Service interface {
 }
 
 type service struct {
-	repository         WalletRepository
-	transactionService transaction.TransactionService
+	repository         Repository
+	transactionService transaction.Service
 }
 
-func NewService(repository WalletRepository, transactionService transaction.TransactionService) Service {
+func NewService(repository Repository, transactionService transaction.Service) Service {
 	return &service{
 		repository:         repository,
 		transactionService: transactionService,

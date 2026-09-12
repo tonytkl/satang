@@ -7,7 +7,7 @@ import (
 	"github.com/tonytkl/satang/repository"
 )
 
-type WalletRepository interface {
+type Repository interface {
 	CreateWallet(ctx context.Context, wallet *Wallet) error
 	ListWallets(ctx context.Context, ownerID string, nextToken string, limit int32) ([]*Wallet, string, error)
 	GetWallet(ctx context.Context, ownerID string, walletID string) (*Wallet, error)
@@ -21,7 +21,7 @@ type walletRepository struct {
 	baseRepository repository.BaseRepository[*Wallet]
 }
 
-func NewWalletRepository(db clients.DynamoDBClient, tableName string) WalletRepository {
+func NewRepository(db clients.DynamoDBClient, tableName string) Repository {
 	return &walletRepository{
 		db:             db,
 		tableName:      tableName,

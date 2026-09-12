@@ -15,8 +15,8 @@ import (
 // ErrTransactionNotFound is returned when no transaction matches the query.
 var ErrTransactionNotFound = errors.New("transaction not found")
 
-// TransactionRepository defines persistence operations for transactions.
-type TransactionRepository interface {
+// Repository defines persistence operations for transactions.
+type Repository interface {
 	CreateTransaction(ctx context.Context, transaction *Transaction) error
 	GetTransaction(ctx context.Context, ownerID string, transactionID string) (*Transaction, error)
 	EditTransaction(ctx context.Context, ownerID string, transactionID string, changedFields map[string]any) error
@@ -30,8 +30,8 @@ type transactionRepository struct {
 	baseRepository repository.BaseRepository[*Transaction]
 }
 
-// NewTransactionRepository creates a transaction repository backed by DynamoDB.
-func NewTransactionRepository(db clients.DynamoDBClient, tableName string) TransactionRepository {
+// NewRepository creates a transaction repository backed by DynamoDB.
+func NewRepository(db clients.DynamoDBClient, tableName string) Repository {
 	return &transactionRepository{
 		db:             db,
 		tableName:      tableName,

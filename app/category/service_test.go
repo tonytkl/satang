@@ -17,7 +17,7 @@ type mockCategoryRepository struct {
 	deleteCategoryFn  func(ctx context.Context, ownerID string, categoryID string) error
 }
 
-var _ CategoryRepository = (*mockCategoryRepository)(nil)
+var _ Repository = (*mockCategoryRepository)(nil)
 
 func (m *mockCategoryRepository) CreateCategory(ctx context.Context, category *Category) error {
 	if m.createCategoryFn != nil {

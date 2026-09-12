@@ -19,7 +19,7 @@ type mockTransactionRepository struct {
 	deleteTransactionFn          func(ctx context.Context, ownerID string, transactionID string) error
 }
 
-var _ TransactionRepository = (*mockTransactionRepository)(nil)
+var _ Repository = (*mockTransactionRepository)(nil)
 
 func (m *mockTransactionRepository) CreateTransaction(ctx context.Context, transaction *Transaction) error {
 	if m.createTransactionFn != nil {
@@ -68,7 +68,7 @@ func TestCreateTransactionSuccess(t *testing.T) {
 		},
 	}
 
-	service := NewTransactionService(mock)
+	service := NewService(mock)
 	ctx := context.Background()
 	testDate := time.Date(2026, time.April, 15, 10, 0, 0, 0, time.UTC)
 
@@ -90,7 +90,7 @@ func TestCreateTransactionSuccess(t *testing.T) {
 }
 
 func TestCreateTransactionInvalidType(t *testing.T) {
-	service := NewTransactionService(&mockTransactionRepository{})
+	service := NewService(&mockTransactionRepository{})
 	ctx := context.Background()
 	testDate := time.Date(2026, time.April, 15, 10, 0, 0, 0, time.UTC)
 
@@ -112,7 +112,7 @@ func TestCreateTransactionInvalidType(t *testing.T) {
 }
 
 func TestCreateTransactionMissingAmount(t *testing.T) {
-	service := NewTransactionService(&mockTransactionRepository{})
+	service := NewService(&mockTransactionRepository{})
 	ctx := context.Background()
 	testDate := time.Date(2026, time.April, 15, 10, 0, 0, 0, time.UTC)
 
@@ -134,7 +134,7 @@ func TestCreateTransactionMissingAmount(t *testing.T) {
 }
 
 func TestCreateTransactionMissingCurrency(t *testing.T) {
-	service := NewTransactionService(&mockTransactionRepository{})
+	service := NewService(&mockTransactionRepository{})
 	ctx := context.Background()
 	testDate := time.Date(2026, time.April, 15, 10, 0, 0, 0, time.UTC)
 
@@ -156,7 +156,7 @@ func TestCreateTransactionMissingCurrency(t *testing.T) {
 }
 
 func TestCreateTransactionMissingWalletID(t *testing.T) {
-	service := NewTransactionService(&mockTransactionRepository{})
+	service := NewService(&mockTransactionRepository{})
 	ctx := context.Background()
 	testDate := time.Date(2026, time.April, 15, 10, 0, 0, 0, time.UTC)
 
@@ -178,7 +178,7 @@ func TestCreateTransactionMissingWalletID(t *testing.T) {
 }
 
 func TestCreateTransactionMissingCategoryID(t *testing.T) {
-	service := NewTransactionService(&mockTransactionRepository{})
+	service := NewService(&mockTransactionRepository{})
 	ctx := context.Background()
 	testDate := time.Date(2026, time.April, 15, 10, 0, 0, 0, time.UTC)
 
@@ -200,7 +200,7 @@ func TestCreateTransactionMissingCategoryID(t *testing.T) {
 }
 
 func TestCreateTransactionMissingDate(t *testing.T) {
-	service := NewTransactionService(&mockTransactionRepository{})
+	service := NewService(&mockTransactionRepository{})
 	ctx := context.Background()
 	zeroDate := time.Time{}
 
@@ -229,7 +229,7 @@ func TestCreateTransactionRepositoryError(t *testing.T) {
 		},
 	}
 
-	service := NewTransactionService(mock)
+	service := NewService(mock)
 	ctx := context.Background()
 	testDate := time.Date(2026, time.April, 15, 10, 0, 0, 0, time.UTC)
 
@@ -270,7 +270,7 @@ func TestGetTransactionSuccess(t *testing.T) {
 		},
 	}
 
-	service := NewTransactionService(mock)
+	service := NewService(mock)
 	ctx := context.Background()
 
 	tx, err := service.GetTransaction(ctx, "tx-1", "user-1")
@@ -279,7 +279,7 @@ func TestGetTransactionSuccess(t *testing.T) {
 }
 
 func TestGetTransactionEmptyID(t *testing.T) {
-	service := NewTransactionService(&mockTransactionRepository{})
+	service := NewService(&mockTransactionRepository{})
 	ctx := context.Background()
 
 	tx, err := service.GetTransaction(ctx, "", "")
@@ -295,7 +295,7 @@ func TestGetTransactionRepositoryError(t *testing.T) {
 		},
 	}
 
-	service := NewTransactionService(mock)
+	service := NewService(mock)
 	ctx := context.Background()
 
 	tx, err := service.GetTransaction(ctx, "tx-1", "user-1")
@@ -326,7 +326,7 @@ func TestCreateTransactionAllTypes(t *testing.T) {
 				},
 			}
 
-			service := NewTransactionService(mock)
+			service := NewService(mock)
 			ctx := context.Background()
 			testDate := time.Date(2026, time.April, 15, 10, 0, 0, 0, time.UTC)
 
@@ -366,7 +366,7 @@ func TestListTransactionsDefaultsAndDelegatesToRepository(t *testing.T) {
 		},
 	}
 
-	service := NewTransactionService(mock)
+	service := NewService(mock)
 	txs, token, err := service.ListTransactions(context.Background(), "user-1", from, to, 25, "token-1")
 	require.NoError(t, err)
 	assert.Len(t, txs, 1)
@@ -375,7 +375,7 @@ func TestListTransactionsDefaultsAndDelegatesToRepository(t *testing.T) {
 }
 
 func TestListTransactionsValidation(t *testing.T) {
-	service := NewTransactionService(&mockTransactionRepository{})
+	service := NewService(&mockTransactionRepository{})
 	from := time.Date(2026, time.April, 1, 0, 0, 0, 0, time.UTC)
 	to := time.Date(2026, time.April, 30, 0, 0, 0, 0, time.UTC)
 
@@ -406,7 +406,7 @@ func TestListTransactionsOfCategoryDelegatesToRepository(t *testing.T) {
 		},
 	}
 
-	service := NewTransactionService(mock)
+	service := NewService(mock)
 	txs, token, err := service.ListTransactionsOfCategory(context.Background(), "user-1", from, to, 15, "token-1", "category-1")
 	require.NoError(t, err)
 	assert.Len(t, txs, 1)
@@ -431,7 +431,7 @@ func TestListTransactionsOfWalletDelegatesToRepository(t *testing.T) {
 		},
 	}
 
-	service := NewTransactionService(mock)
+	service := NewService(mock)
 	txs, token, err := service.ListTransactionsOfWallet(context.Background(), "user-1", from, to, 20, "token-2", "wallet-1")
 	require.NoError(t, err)
 	assert.Len(t, txs, 1)
@@ -440,7 +440,7 @@ func TestListTransactionsOfWalletDelegatesToRepository(t *testing.T) {
 }
 
 func TestEditTransactionRejectsOwnerIDAndNormalizesType(t *testing.T) {
-	service := NewTransactionService(&mockTransactionRepository{})
+	service := NewService(&mockTransactionRepository{})
 
 	err := service.EditTransaction(context.Background(), "user-1", "tx-1", map[string]any{"OwnerID": "user-2"})
 	require.EqualError(t, err, "Owner ID is not updateable")
@@ -459,7 +459,7 @@ func TestEditTransactionDelegatesToRepository(t *testing.T) {
 		},
 	}
 
-	service := NewTransactionService(mock)
+	service := NewService(mock)
 	err := service.EditTransaction(context.Background(), "user-1", "tx-1", map[string]any{"Type": "income"})
 	require.NoError(t, err)
 }
@@ -473,7 +473,7 @@ func TestDeleteTransactionDelegatesToRepository(t *testing.T) {
 		},
 	}
 
-	service := NewTransactionService(mock)
+	service := NewService(mock)
 	err := service.DeleteTransaction(context.Background(), "user-1", "tx-1")
 	require.NoError(t, err)
 }

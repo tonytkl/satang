@@ -19,7 +19,7 @@ type mockWalletRepository struct {
 	deleteWalletFn func(ctx context.Context, ownerID string, walletID string) error
 }
 
-var _ WalletRepository = (*mockWalletRepository)(nil)
+var _ Repository = (*mockWalletRepository)(nil)
 
 func (m *mockWalletRepository) CreateWallet(ctx context.Context, wallet *Wallet) error {
 	if m.createWalletFn != nil {
@@ -60,7 +60,7 @@ type mockTransactionService struct {
 	createTransactionFn func(ctx context.Context, walletID string, walletName string, categoryID string, categoryName string, description string, currency string, imageURL string, txType string, amount float64, date time.Time, ownerID string) error
 }
 
-var _ transaction.TransactionService = (*mockTransactionService)(nil)
+var _ transaction.Service = (*mockTransactionService)(nil)
 
 func (m *mockTransactionService) CreateTransaction(ctx context.Context, walletID string, walletName string, categoryID string, categoryName string, description string, currency string, imageURL string, txType string, amount float64, date time.Time, ownerID string) error {
 	if m.createTransactionFn != nil {

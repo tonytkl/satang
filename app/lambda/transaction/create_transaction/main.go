@@ -35,7 +35,7 @@ type errorResponse struct {
 }
 
 type createTransactionLambda struct {
-	service transaction.TransactionService
+	service transaction.Service
 }
 
 func main() {
@@ -50,8 +50,8 @@ func main() {
 		panic("TABLE_NAME is required")
 	}
 
-	repository := transaction.NewTransactionRepository(db, tableName)
-	transactionService := transaction.NewTransactionService(repository)
+	repository := transaction.NewRepository(db, tableName)
+	transactionService := transaction.NewService(repository)
 	handler := &createTransactionLambda{service: transactionService}
 
 	lambda.Start(handler.Handle)

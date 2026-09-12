@@ -23,7 +23,7 @@ infrastructure/
 		├── dynamodb.tf             # DynamoDB table and GSIs
 		├── iam.tf                  # Shared Lambda IAM role and DynamoDB permissions
 		├── lambda_module.tf        # Lambda module wiring
-		├── api_gateway.tf          # HTTP API, routes module wiring, and default stage
+		├── api_gateway.tf          # HTTP API, route map, and default stage
 		├── outputs.tf              # Root outputs
 		├── terraform.tfvars        # Environment variable values
 		├── lambda/
@@ -32,7 +32,7 @@ infrastructure/
 		│       ├── variables.tf
 		│       └── outputs.tf
 		├── api_route/
-		│   └── <operation>/
+		│   └── http_route/
 		│       ├── main.tf
 		│       └── variables.tf
 		└── terraform.tfstate.d/    # Local workspace state directories
@@ -81,12 +81,13 @@ All GSIs use `projection_type = "ALL"` with provisioned capacity `2/2`.
 ### Lambda and API Routing Pattern
 
 - Each Lambda is defined in its own module under `terraform/lambda/<operation>/`.
-- Each API route integration is defined in `terraform/api_route/<operation>/`.
-- `api_gateway.tf` creates one HTTP API (`$default` auto-deploy stage) and wires route modules to Lambda module outputs.
-- Each route module creates:
+- API routes are handled by a single reusable module at `terraform/api_route/http_route/`.
+- `api_gateway.tf` defines a route map and uses `for_each` to create each endpoint from the same module.
+- Each route instance creates:
 	- API integration (`AWS_PROXY`, payload format `2.0`)
-	- Route (`<METHOD> <PATH>`)
+	- Route (`<METHOD> <PATH>`) using the public request method
 	- Lambda invoke permission for API Gateway
+- The integration method is intentionally fixed to `POST` for Lambda-backed HTTP API routes, even when the public route is `GET`.
 
 ## Variables
 

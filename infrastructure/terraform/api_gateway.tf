@@ -4,29 +4,35 @@ resource "aws_apigatewayv2_api" "satang_api" {
 }
 
 locals {
-  api_routes = {
+  transaction_routes = {
     create_transaction = {
       method                  = "POST"
       path                    = "/api/v1.0/transactions"
-      integration_uri         = module.lambda_create_transaction.create_transaction_invoke_arn
-      lambda_function_name    = module.lambda_create_transaction.create_transaction_function_name
+      integration_uri         = module.lambdas["create_transaction"].invoke_arn
+      lambda_function_name    = module.lambdas["create_transaction"].function_name
       permission_statement_id = "AllowExecutionFromAPIGatewayCreateTransaction"
     }
     get_transaction = {
       method                  = "GET"
       path                    = "/api/v1.0/transactions/{transaction_id}"
-      integration_uri         = module.lambda_get_transaction.get_transaction_invoke_arn
-      lambda_function_name    = module.lambda_get_transaction.get_transaction_function_name
+      integration_uri         = module.lambdas["get_transaction"].invoke_arn
+      lambda_function_name    = module.lambdas["get_transaction"].function_name
       permission_statement_id = "AllowExecutionFromAPIGatewayGetTransaction"
     }
     list_transactions = {
       method                  = "GET"
       path                    = "/api/v1.0/transactions"
-      integration_uri         = module.lambda_list_transactions.list_transactions_invoke_arn
-      lambda_function_name    = module.lambda_list_transactions.list_transactions_function_name
+      integration_uri         = module.lambdas["list_transactions"].invoke_arn
+      lambda_function_name    = module.lambdas["list_transactions"].function_name
       permission_statement_id = "AllowExecutionFromAPIGatewayListTransactions"
     }
   }
+
+  # Keep wallet routes as a separate map so they can be enabled when wallet
+  # Lambda functions are added to local.lambda_functions.
+  wallet_routes = {}
+
+  api_routes = merge(local.transaction_routes, local.wallet_routes)
 }
 
 module "api_routes" {

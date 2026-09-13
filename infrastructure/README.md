@@ -9,7 +9,7 @@ Terraform currently provisions:
 - One DynamoDB table with composite primary key (`PK`, `SK`)
 - Three global secondary indexes (`GSI1`, `GSI2`, `GSI3`)
 - One shared IAM role for Lambda execution
-- Multiple Lambda functions (operation-specific modules)
+- Multiple Lambda functions from one reusable module (instantiated via `for_each`)
 - One API Gateway HTTP API with multiple routes integrated to Lambda
 
 ## Directory Layout
@@ -27,10 +27,9 @@ infrastructure/
 		├── outputs.tf              # Root outputs
 		├── terraform.tfvars        # Environment variable values
 		├── lambda/
-		│   └── <operation>/
-		│       ├── lambda_<operation>.tf
-		│       ├── variables.tf
-		│       └── outputs.tf
+		│   ├── main.tf
+		│   ├── variables.tf
+		│   └── outputs.tf
 		├── api_route/
 		│   └── http_route/
 		│       ├── main.tf
@@ -80,7 +79,8 @@ All GSIs use `projection_type = "ALL"` with provisioned capacity `2/2`.
 
 ### Lambda and API Routing Pattern
 
-- Each Lambda is defined in its own module under `terraform/lambda/<operation>/`.
+- Lambda declarations are centralized in `terraform/lambda_module.tf` as `local.lambda_functions`.
+- A reusable module at `terraform/lambda/` creates each Lambda via `for_each`.
 - API routes are handled by a single reusable module at `terraform/api_route/http_route/`.
 - `api_gateway.tf` defines a route map and uses `for_each` to create each endpoint from the same module.
 - Each route instance creates:
@@ -88,6 +88,22 @@ All GSIs use `projection_type = "ALL"` with provisioned capacity `2/2`.
 	- Route (`<METHOD> <PATH>`) using the public request method
 	- Lambda invoke permission for API Gateway
 - The integration method is intentionally fixed to `POST` for Lambda-backed HTTP API routes, even when the public route is `GET`.
+
+### Adding a New Lambda Function
+
+1. Build/package the Lambda zip to `aws/lambda/<operation>.zip`.
+2. Add an entry under `local.lambda_functions` in `terraform/lambda_module.tf`:
+
+```hcl
+<operation> = {
+  function_name = "satang-<operation-name>"
+  artifact_path = "../../aws/lambda/<operation>.zip"
+}
+```
+
+3. Add the API route metadata in `api_gateway.tf` route locals (if exposed by API).
+
+This avoids creating another root module block per operation.
 
 ## Variables
 

@@ -25,12 +25,12 @@ func (m *MockWalletService) CreateWallet(ctx context.Context, ownerID string, na
 	return nil
 }
 
-func (m *MockWalletService) ListWallets(ctx context.Context, ownerID string, nextToken string, limit int32) ([]*wallet.Wallet, string, error) {
+func (m *MockWalletService) ListWallets(ctx context.Context, ownerID string, nextToken string, limit int32) ([]wallet.Wallet, string, error) {
 	return nil, "", nil
 }
 
-func (m *MockWalletService) GetWallet(ctx context.Context, ownerID string, walletID string) (*wallet.Wallet, error) {
-	return nil, nil
+func (m *MockWalletService) GetWallet(ctx context.Context, ownerID string, walletID string) (wallet.Wallet, error) {
+	return wallet.Wallet{}, nil
 }
 
 func (m *MockWalletService) EditWallet(ctx context.Context, ownerID string, walletID string, changedFields map[string]any) error {

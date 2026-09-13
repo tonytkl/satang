@@ -12,34 +12,34 @@ import (
 )
 
 type mockWalletRepository struct {
-	createWalletFn func(ctx context.Context, wallet *Wallet) error
-	listWalletsFn  func(ctx context.Context, ownerID string, nextToken string, limit int32) ([]*Wallet, string, error)
-	getWalletFn    func(ctx context.Context, ownerID string, walletID string) (*Wallet, error)
+	createWalletFn func(ctx context.Context, wallet Wallet) error
+	listWalletsFn  func(ctx context.Context, ownerID string, nextToken string, limit int32) ([]Wallet, string, error)
+	getWalletFn    func(ctx context.Context, ownerID string, walletID string) (Wallet, error)
 	editWalletFn   func(ctx context.Context, ownerID string, walletID string, changedFields map[string]any) error
 	deleteWalletFn func(ctx context.Context, ownerID string, walletID string) error
 }
 
 var _ Repository = (*mockWalletRepository)(nil)
 
-func (m *mockWalletRepository) CreateWallet(ctx context.Context, wallet *Wallet) error {
+func (m *mockWalletRepository) CreateWallet(ctx context.Context, wallet Wallet) error {
 	if m.createWalletFn != nil {
 		return m.createWalletFn(ctx, wallet)
 	}
 	return nil
 }
 
-func (m *mockWalletRepository) ListWallets(ctx context.Context, ownerID string, nextToken string, limit int32) ([]*Wallet, string, error) {
+func (m *mockWalletRepository) ListWallets(ctx context.Context, ownerID string, nextToken string, limit int32) ([]Wallet, string, error) {
 	if m.listWalletsFn != nil {
 		return m.listWalletsFn(ctx, ownerID, nextToken, limit)
 	}
 	return nil, "", nil
 }
 
-func (m *mockWalletRepository) GetWallet(ctx context.Context, ownerID string, walletID string) (*Wallet, error) {
+func (m *mockWalletRepository) GetWallet(ctx context.Context, ownerID string, walletID string) (Wallet, error) {
 	if m.getWalletFn != nil {
 		return m.getWalletFn(ctx, ownerID, walletID)
 	}
-	return nil, nil
+	return Wallet{}, nil
 }
 
 func (m *mockWalletRepository) EditWallet(ctx context.Context, ownerID string, walletID string, changedFields map[string]any) error {
@@ -95,7 +95,7 @@ func (m *mockTransactionService) DeleteTransaction(ctx context.Context, ownerID 
 
 func TestCreateWalletUsesDefaultCurrencyAndInitialBalance(t *testing.T) {
 	repo := &mockWalletRepository{
-		createWalletFn: func(ctx context.Context, wallet *Wallet) error {
+		createWalletFn: func(ctx context.Context, wallet Wallet) error {
 			require.NotEmpty(t, wallet.ID)
 			assert.Equal(t, "user-1", wallet.OwnerID)
 			assert.Equal(t, "Primary Wallet", wallet.Name)
@@ -137,7 +137,7 @@ func TestCreateWalletInvalidTypeReturnsError(t *testing.T) {
 func TestCreateWalletRejectsEmptyOwnerID(t *testing.T) {
 	repoCalled := false
 	repo := &mockWalletRepository{
-		createWalletFn: func(ctx context.Context, wallet *Wallet) error {
+		createWalletFn: func(ctx context.Context, wallet Wallet) error {
 			repoCalled = true
 			return nil
 		},
@@ -154,9 +154,9 @@ func TestCreateWalletRejectsEmptyOwnerID(t *testing.T) {
 func TestListWalletsRejectsNegativeLimit(t *testing.T) {
 	repoCalled := false
 	repo := &mockWalletRepository{
-		listWalletsFn: func(ctx context.Context, ownerID string, nextToken string, limit int32) ([]*Wallet, string, error) {
+		listWalletsFn: func(ctx context.Context, ownerID string, nextToken string, limit int32) ([]Wallet, string, error) {
 			repoCalled = true
-			return []*Wallet{}, "", nil
+			return []Wallet{}, "", nil
 		},
 	}
 

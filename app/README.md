@@ -25,6 +25,16 @@ app/
 └── go.mod
 ```
 
+## Go API Conventions
+
+List endpoints use value slices as the default convention across the app layer.
+
+- Prefer `[]Wallet` and `[]Transaction` for collection return values.
+- Use pointer returns only for single-resource fetches or when the value can be absent, such as `GetWallet(...) (*Wallet, error)`.
+- Keep conversion logic at the repository boundary when persistence uses pointer-backed internals.
+
+This keeps the service and API layers consistent with the shared `BaseRepository[List]` behavior and with the schema builders used to produce HTTP responses.
+
 ## Local Development
 
 ### 1. Start DynamoDB Local

@@ -8,9 +8,9 @@ import (
 )
 
 type Repository interface {
-	CreateWallet(ctx context.Context, wallet *Wallet) error
-	ListWallets(ctx context.Context, ownerID string, nextToken string, limit int32) ([]*Wallet, string, error)
-	GetWallet(ctx context.Context, ownerID string, walletID string) (*Wallet, error)
+	CreateWallet(ctx context.Context, wallet Wallet) error
+	ListWallets(ctx context.Context, ownerID string, nextToken string, limit int32) ([]Wallet, string, error)
+	GetWallet(ctx context.Context, ownerID string, walletID string) (Wallet, error)
 	EditWallet(ctx context.Context, ownerID string, walletID string, changedFields map[string]any) error
 	DeleteWallet(ctx context.Context, ownerID string, walletID string) error
 }
@@ -29,16 +29,33 @@ func NewRepository(db clients.DynamoDBClient, tableName string) Repository {
 	}
 }
 
-func (walletRepository *walletRepository) CreateWallet(ctx context.Context, wallet *Wallet) error {
-	return walletRepository.baseRepository.Save(ctx, wallet)
+func (walletRepository *walletRepository) CreateWallet(ctx context.Context, wallet Wallet) error {
+	return walletRepository.baseRepository.Save(ctx, &wallet)
 }
 
-func (walletRepository *walletRepository) ListWallets(ctx context.Context, ownerID string, nextToken string, limit int32) ([]*Wallet, string, error) {
-	return walletRepository.baseRepository.List(ctx, ownerID, nextToken, limit)
+func (walletRepository *walletRepository) ListWallets(ctx context.Context, ownerID string, nextToken string, limit int32) ([]Wallet, string, error) {
+	items, encodedNextToken, err := walletRepository.baseRepository.List(ctx, ownerID, nextToken, limit)
+	if err != nil {
+		return nil, "", err
+	}
+
+	wallets := make([]Wallet, 0, len(items))
+	for _, item := range items {
+		if item == nil {
+			continue
+		}
+		wallets = append(wallets, *item)
+	}
+
+	return wallets, encodedNextToken, nil
 }
 
-func (walletRepository *walletRepository) GetWallet(ctx context.Context, ownerID string, walletID string) (*Wallet, error) {
-	return walletRepository.baseRepository.Get(ctx, ownerID, walletID)
+func (walletRepository *walletRepository) GetWallet(ctx context.Context, ownerID string, walletID string) (Wallet, error) {
+	wallet, err := walletRepository.baseRepository.Get(ctx, ownerID, walletID)
+	if err != nil {
+		return Wallet{}, err
+	}
+	return *wallet, nil
 }
 
 func (walletRepository *walletRepository) EditWallet(ctx context.Context, ownerID string, walletID string, changedFields map[string]any) error {

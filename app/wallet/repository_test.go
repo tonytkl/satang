@@ -83,7 +83,7 @@ func TestWalletRepositoryCreateWallet(t *testing.T) {
 	}
 
 	repo := NewRepository(db, "wallets")
-	err := repo.CreateWallet(context.Background(), &Wallet{ID: "wallet-1", OwnerID: "owner-1", Name: "Cash"})
+	err := repo.CreateWallet(context.Background(), Wallet{ID: "wallet-1", OwnerID: "owner-1", Name: "Cash"})
 	require.NoError(t, err)
 }
 

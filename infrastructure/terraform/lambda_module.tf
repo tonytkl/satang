@@ -1,5 +1,5 @@
 locals {
-  lambda_functions = {
+  transaction_functions = {
     # Transactions
     create_transaction = {
       function_name = "satang-create-transaction"
@@ -14,6 +14,22 @@ locals {
       artifact_path = "../../aws/lambda/list_transactions.zip"
     }
   }
+  wallet_functions = {
+    # Wallets
+    create_wallet = {
+      function_name = "satang-create-wallet"
+      artifact_path = "../../aws/lambda/create_wallet.zip"
+    }
+    get_wallet = {
+      function_name = "satang-get-wallet"
+      artifact_path = "../../aws/lambda/get_wallet.zip"
+    }
+    list_wallets = {
+      function_name = "satang-list-wallets"
+      artifact_path = "../../aws/lambda/list_wallets.zip"
+    }
+  }
+  lambda_functions = merge(local.transaction_functions, local.wallet_functions)
 }
 
 module "lambdas" {

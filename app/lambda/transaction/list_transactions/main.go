@@ -25,7 +25,7 @@ type listTransactionsLambda struct {
 }
 
 type listTransactionsResponse struct {
-	Transactions []transaction.TransactionSchemas `json:"transactions"`
+	Transactions []transaction.TransactionRead `json:"transactions"`
 	NextToken    string                           `json:"nextToken"`
 }
 
@@ -98,7 +98,7 @@ func (handler *listTransactionsLambda) Handle(ctx context.Context, request event
 		return utils.JsonResponse(http.StatusInternalServerError, errorResponse{Message: err.Error()})
 	}
 
-	responseTransactions, err := transaction.BuildTransactionSchemas(transactions)
+	responseTransactions, err := transaction.BuildTransactionRead(transactions)
 	if err != nil {
 		return utils.JsonResponse(http.StatusInternalServerError, errorResponse{Message: err.Error()})
 	}

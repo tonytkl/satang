@@ -2,10 +2,13 @@ package wallet
 
 import (
 	"context"
+	"errors"
 
 	"github.com/tonytkl/satang/clients"
 	"github.com/tonytkl/satang/repository"
 )
+
+var ErrWalletNotFound = errors.New("wallet not found")
 
 type Repository interface {
 	CreateWallet(ctx context.Context, wallet Wallet) error
@@ -53,7 +56,13 @@ func (walletRepository *walletRepository) ListWallets(ctx context.Context, owner
 func (walletRepository *walletRepository) GetWallet(ctx context.Context, ownerID string, walletID string) (Wallet, error) {
 	wallet, err := walletRepository.baseRepository.Get(ctx, ownerID, walletID)
 	if err != nil {
+		if errors.Is(err, clients.ErrItemNotFound) {
+			return Wallet{}, ErrWalletNotFound
+		}
 		return Wallet{}, err
+	}
+	if wallet == nil {
+		return Wallet{}, ErrWalletNotFound
 	}
 	return *wallet, nil
 }

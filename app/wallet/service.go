@@ -98,6 +98,13 @@ func (service *service) ListWallets(ctx context.Context, ownerID string, nextTok
 }
 
 func (service *service) GetWallet(ctx context.Context, ownerID string, walletID string) (Wallet, error) {
+	if ownerID == "" {
+		return Wallet{}, errors.New("owner ID is required")
+	}
+	if walletID == "" {
+		return Wallet{}, errors.New("wallet ID is required")
+	}
+
 	return service.repository.GetWallet(
 		ctx,
 		ownerID,

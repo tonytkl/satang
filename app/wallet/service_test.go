@@ -168,6 +168,58 @@ func TestListWalletsRejectsNegativeLimit(t *testing.T) {
 	assert.False(t, repoCalled)
 }
 
+func TestGetWalletRejectsEmptyInputsAndPropagatesRepositoryErrors(t *testing.T) {
+	t.Run("empty owner id", func(t *testing.T) {
+		repoCalled := false
+		repo := &mockWalletRepository{
+			getWalletFn: func(ctx context.Context, ownerID string, walletID string) (Wallet, error) {
+				repoCalled = true
+				return Wallet{}, nil
+			},
+		}
+
+		service := NewService(repo, &mockTransactionService{})
+		_, err := service.GetWallet(context.Background(), "", "wallet-1")
+
+		require.Error(t, err)
+		assert.Equal(t, "owner ID is required", err.Error())
+		assert.False(t, repoCalled)
+	})
+
+	t.Run("empty wallet id", func(t *testing.T) {
+		repoCalled := false
+		repo := &mockWalletRepository{
+			getWalletFn: func(ctx context.Context, ownerID string, walletID string) (Wallet, error) {
+				repoCalled = true
+				return Wallet{}, nil
+			},
+		}
+
+		service := NewService(repo, &mockTransactionService{})
+		_, err := service.GetWallet(context.Background(), "user-1", "")
+
+		require.Error(t, err)
+		assert.Equal(t, "wallet ID is required", err.Error())
+		assert.False(t, repoCalled)
+	})
+
+	t.Run("repository error is propagated", func(t *testing.T) {
+		repo := &mockWalletRepository{
+			getWalletFn: func(ctx context.Context, ownerID string, walletID string) (Wallet, error) {
+				assert.Equal(t, "user-1", ownerID)
+				assert.Equal(t, "wallet-1", walletID)
+				return Wallet{}, ErrWalletNotFound
+			},
+		}
+
+		service := NewService(repo, &mockTransactionService{})
+		got, err := service.GetWallet(context.Background(), "user-1", "wallet-1")
+
+		require.ErrorIs(t, err, ErrWalletNotFound)
+		assert.Equal(t, Wallet{}, got)
+	})
+}
+
 func TestEditWalletRejectsProtectedFields(t *testing.T) {
 	tests := []struct {
 		name          string

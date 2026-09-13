@@ -83,7 +83,7 @@ func TestWalletRepositoryCreateWallet(t *testing.T) {
 	}
 
 	repo := NewRepository(db, "wallets")
-	err := repo.CreateWallet(context.Background(), &Wallet{ID: "wallet-1", OwnerID: "owner-1", Name: "Cash"})
+	err := repo.CreateWallet(context.Background(), Wallet{ID: "wallet-1", OwnerID: "owner-1", Name: "Cash"})
 	require.NoError(t, err)
 }
 
@@ -113,26 +113,41 @@ func TestWalletRepositoryListWallets(t *testing.T) {
 }
 
 func TestWalletRepositoryGetWallet(t *testing.T) {
-	db := &mockWalletDynamoDB{
-		getItemFn: func(_ context.Context, table string, key map[string]any, out any) error {
-			require.Equal(t, "wallets", table)
-			assert.Equal(t, "USER#owner-1", key["PK"])
-			assert.Equal(t, "WALLET#wallet-1", key["SK"])
+	t.Run("returns wallet when found", func(t *testing.T) {
+		db := &mockWalletDynamoDB{
+			getItemFn: func(_ context.Context, table string, key map[string]any, out any) error {
+				require.Equal(t, "wallets", table)
+				assert.Equal(t, "USER#owner-1", key["PK"])
+				assert.Equal(t, "WALLET#wallet-1", key["SK"])
 
-			wallet, ok := out.(*Wallet)
-			require.True(t, ok)
-			wallet.ID = "wallet-1"
-			wallet.OwnerID = "owner-1"
-			wallet.Name = "Cash"
-			return nil
-		},
-	}
+				wallet, ok := out.(*Wallet)
+				require.True(t, ok)
+				wallet.ID = "wallet-1"
+				wallet.OwnerID = "owner-1"
+				wallet.Name = "Cash"
+				return nil
+			},
+		}
 
-	repo := NewRepository(db, "wallets")
-	got, err := repo.GetWallet(context.Background(), "owner-1", "wallet-1")
-	require.NoError(t, err)
-	require.NotNil(t, got)
-	assert.Equal(t, "wallet-1", got.ID)
+		repo := NewRepository(db, "wallets")
+		got, err := repo.GetWallet(context.Background(), "owner-1", "wallet-1")
+		require.NoError(t, err)
+		assert.Equal(t, "wallet-1", got.ID)
+	})
+
+	t.Run("returns ErrWalletNotFound when item is missing", func(t *testing.T) {
+		db := &mockWalletDynamoDB{
+			getItemFn: func(_ context.Context, table string, key map[string]any, out any) error {
+				return clients.ErrItemNotFound
+			},
+		}
+
+		repo := NewRepository(db, "wallets")
+		got, err := repo.GetWallet(context.Background(), "owner-1", "wallet-1")
+
+		require.ErrorIs(t, err, ErrWalletNotFound)
+		assert.Equal(t, Wallet{}, got)
+	})
 }
 
 func TestWalletRepositoryEditWallet(t *testing.T) {

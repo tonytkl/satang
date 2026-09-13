@@ -64,7 +64,7 @@ func (handler *getTransactionLambda) Handle(ctx context.Context, request events.
 		return utils.JsonResponse(http.StatusNotFound, errorResponse{Message: "Transaction not found"})
 	}
 
-	responseSchemas, err := transaction.BuildTransactionSchemas([]transaction.Transaction{*tx})
+	responseSchemas, err := transaction.BuildTransactionRead([]transaction.Transaction{*tx})
 	if err != nil {
 		return utils.JsonResponse(http.StatusInternalServerError, errorResponse{Message: err.Error()})
 	}

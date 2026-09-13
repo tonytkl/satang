@@ -64,7 +64,7 @@ func TestGetTransactionLambda_Handle(t *testing.T) {
 		CreatedAt:    time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC),
 		UpdatedAt:    time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC),
 	}
-	sampleSchema := transaction.TransactionSchemas{
+	sampleSchema := transaction.TransactionRead{
 		ID:           sampleTransaction.ID,
 		WalletID:     sampleTransaction.WalletID,
 		WalletName:   sampleTransaction.WalletName,
@@ -84,7 +84,7 @@ func TestGetTransactionLambda_Handle(t *testing.T) {
 		transactionID  string
 		service        *mockTransactionService
 		wantStatusCode int
-		wantSchema     *transaction.TransactionSchemas
+		wantSchema     *transaction.TransactionRead
 		wantBody       string
 	}{
 		{
@@ -143,7 +143,7 @@ func TestGetTransactionLambda_Handle(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, tt.wantStatusCode, resp.StatusCode)
 			if tt.wantSchema != nil {
-				var got transaction.TransactionSchemas
+				var got transaction.TransactionRead
 				require.NoError(t, json.Unmarshal([]byte(resp.Body), &got))
 				assert.Equal(t, *tt.wantSchema, got)
 			}

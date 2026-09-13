@@ -53,8 +53,8 @@ create_output="$(aws_local dynamodb create-table \
   --attribute-definitions \
     AttributeName=PK,AttributeType=S \
     AttributeName=SK,AttributeType=S \
-    AttributeName=GSI_PK,AttributeType=S \
-    AttributeName=GSI_SK,AttributeType=S \
+    AttributeName=GSI1_PK,AttributeType=S \
+    AttributeName=GSI1_SK,AttributeType=S \
     AttributeName=GSI2_PK,AttributeType=S \
     AttributeName=GSI2_SK,AttributeType=S \
     AttributeName=GSI3_PK,AttributeType=S \
@@ -66,8 +66,8 @@ create_output="$(aws_local dynamodb create-table \
     {
       "IndexName": "GSI1",
       "KeySchema": [
-        {"AttributeName": "GSI_PK", "KeyType": "HASH"},
-        {"AttributeName": "GSI_SK", "KeyType": "RANGE"}
+        {"AttributeName": "GSI1_PK", "KeyType": "HASH"},
+        {"AttributeName": "GSI1_SK", "KeyType": "RANGE"}
       ],
       "Projection": {"ProjectionType": "ALL"}
     },

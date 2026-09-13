@@ -61,7 +61,7 @@ Resource: `aws_dynamodb_table.dynamodb_table`
 - Read/Write capacity: `2/2`
 - Primary key: `PK` + `SK`
 - GSIs:
-	- `GSI1` on `GSI_PK` + `GSI_SK`
+	- `GSI1` on `GSI1_PK` + `GSI1_SK`
 	- `GSI2` on `GSI2_PK` + `GSI2_SK`
 	- `GSI3` on `GSI3_PK` + `GSI3_SK`
 

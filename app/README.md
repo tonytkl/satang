@@ -71,7 +71,7 @@ The project uses a single-table design pattern with DynamoDB, utilizing prefixed
 **Key Design:**
 - `PK` (Partition Key) — Primary access pattern
 - `SK` (Sort Key) — Primary sort/range pattern
-- `GSI_PK` / `GSI_SK` — Secondary access patterns via Global Secondary Indexes
+- `GSI1_PK` / `GSI1_SK`, `GSI2_PK` / `GSI2_SK`, `GSI3_PK` / `GSI3_SK` — Secondary access patterns via Global Secondary Indexes
 
 **Naming Conventions:**
 Keys are prefixed with entity type for clarity. For example:

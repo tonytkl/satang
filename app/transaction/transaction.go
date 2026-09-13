@@ -18,14 +18,14 @@ const (
 // Transaction represents a financial transaction associated with a wallet.
 // DynamoDB keys:
 //
-//		PK = "USER#<UserID>"
-//		SK = "TX#<ID>"
-//		GSI_ByDatePK = "USER#<UserID>"
-//	    GSI_ByDateSK = "TX#<Date>#<ID>"
-//		GSI_ByWalletPK = "USER#<UserID>#TX_WALLET#<WALLET_ID>"
-//		GSI_ByWalletSK = "TX#<Date>#<ID>"
-//		GSI_ByCategoryPK = "USER#<UserID>#TX_CATEGORY#<CATEGORY_ID>"
-//		GSI_ByCategorySK = "TX#<Date>#<ID>"
+//	PK = "USER#<UserID>"
+//	SK = "TX#<ID>"
+//	GSI_ByDatePK = "USER#<UserID>"
+//	GSI_ByDateSK = "TX#<Date>#<ID>"
+//	GSI_ByWalletPK = "USER#<UserID>#TX_WALLET#<WALLET_ID>"
+//	GSI_ByWalletSK = "TX#<Date>#<ID>"
+//	GSI_ByCategoryPK = "USER#<UserID>#TX_CATEGORY#<CATEGORY_ID>"
+//	GSI_ByCategorySK = "TX#<Date>#<ID>"
 type Transaction struct {
 	PK               string          `dynamodbav:"PK"`
 	SK               string          `dynamodbav:"SK"`

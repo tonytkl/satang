@@ -17,12 +17,12 @@ resource "aws_dynamodb_table" "dynamodb_table" {
   }
 
   attribute {
-    name = "GSI_PK"
+    name = "GSI1_PK"
     type = "S"
   }
 
   attribute {
-    name = "GSI_SK"
+    name = "GSI1_SK"
     type = "S"
   }
 
@@ -48,8 +48,8 @@ resource "aws_dynamodb_table" "dynamodb_table" {
 
   global_secondary_index {
     name            = "GSI1"
-    hash_key        = "GSI_PK"
-    range_key       = "GSI_SK"
+    hash_key        = "GSI1_PK"
+    range_key       = "GSI1_SK"
     projection_type = "ALL"
     read_capacity   = 2
     write_capacity  = 2

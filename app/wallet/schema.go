@@ -12,19 +12,23 @@ type WalletRead struct {
 	UpdatedAt  time.Time  `json:"updatedAt"`
 }
 
-func BuildWalletRead(wallets []Wallet) []WalletRead {
+func BuildWalletReadList(wallets []Wallet) []WalletRead {
 	walletResponse := make([]WalletRead, 0, len(wallets))
 	for _, wallet := range wallets {
-		schemaWallet := WalletRead{
-			ID:         wallet.ID,
-			Name:       wallet.Name,
-			WalletType: wallet.Type,
-			Currency:   wallet.Currency,
-			OwnerID:    wallet.OwnerID,
-			CreatedAt:  wallet.CreatedAt,
-			UpdatedAt:  wallet.UpdatedAt,
-		}
+		schemaWallet := BuildWalletRead(wallet)
 		walletResponse = append(walletResponse, schemaWallet)
 	}
 	return walletResponse
+}
+
+func BuildWalletRead(wallet Wallet) WalletRead {
+	return WalletRead{
+		ID:         wallet.ID,
+		Name:       wallet.Name,
+		WalletType: wallet.Type,
+		Currency:   wallet.Currency,
+		OwnerID:    wallet.OwnerID,
+		CreatedAt:  wallet.CreatedAt,
+		UpdatedAt:  wallet.UpdatedAt,
+	}
 }

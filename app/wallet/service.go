@@ -11,7 +11,7 @@ import (
 )
 
 type Service interface {
-	CreateWallet(ctx context.Context, ownerID string, name string, currency string, balance float64, strWalletType string) error
+	CreateWallet(ctx context.Context, ownerID string, name string, currency string, balance float64, strWalletType string) (Wallet, error)
 	ListWallets(ctx context.Context, ownerID string, nextToken string, limit int32) ([]Wallet, string, error)
 	GetWallet(ctx context.Context, ownerID string, walletID string) (Wallet, error)
 	EditWallet(ctx context.Context, ownerID string, walletID string, changedFields map[string]any) error
@@ -30,9 +30,11 @@ func NewService(repository Repository, transactionService transaction.Service) S
 	}
 }
 
-func (service *service) CreateWallet(ctx context.Context, ownerID string, name string, currency string, balance float64, strWalletType string) error {
+func (service *service) CreateWallet(ctx context.Context, ownerID string, name string, currency string, balance float64, strWalletType string) (Wallet, error) {
+	var wallet Wallet
+
 	if ownerID == "" {
-		return errors.New("owner ID is required")
+		return wallet, errors.New("owner ID is required")
 	}
 
 	// TODO: Implement currency query from user model
@@ -43,9 +45,9 @@ func (service *service) CreateWallet(ctx context.Context, ownerID string, name s
 	walletID := utils.GetUUID()
 	walletType, err := getWalletType(strWalletType)
 	if err != nil {
-		return err
+		return wallet, err
 	}
-	wallet := NewWallet(
+	wallet = NewWallet(
 		walletID,
 		ownerID,
 		name,
@@ -55,7 +57,7 @@ func (service *service) CreateWallet(ctx context.Context, ownerID string, name s
 	wallet.Balance = balance
 
 	if err := service.repository.CreateWallet(ctx, wallet); err != nil {
-		return err
+		return wallet, err
 	}
 
 	if balance != 0 {
@@ -75,11 +77,11 @@ func (service *service) CreateWallet(ctx context.Context, ownerID string, name s
 			wallet.OwnerID,
 		); err != nil {
 			_ = service.repository.DeleteWallet(ctx, ownerID, wallet.ID)
-			return err
+			return wallet, err
 		}
 	}
 
-	return nil
+	return wallet, nil
 }
 
 func (service *service) ListWallets(ctx context.Context, ownerID string, nextToken string, limit int32) ([]Wallet, string, error) {

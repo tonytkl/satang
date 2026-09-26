@@ -18,8 +18,8 @@ type mockWalletService struct {
 	listWalletsFunc func(ctx context.Context, ownerID string, nextToken string, limit int32) ([]wallet.Wallet, string, error)
 }
 
-func (m *mockWalletService) CreateWallet(ctx context.Context, ownerID string, name string, currency string, balance float64, walletType string) error {
-	return nil
+func (m *mockWalletService) CreateWallet(ctx context.Context, ownerID string, name string, currency string, balance float64, walletType string) (wallet.Wallet, error) {
+	return wallet.Wallet{}, nil
 }
 
 func (m *mockWalletService) ListWallets(ctx context.Context, ownerID string, nextToken string, limit int32) ([]wallet.Wallet, string, error) {

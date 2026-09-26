@@ -65,6 +65,6 @@ func (handler *getWalletLambda) Handle(ctx context.Context, request events.APIGa
 		return utils.JsonResponse(http.StatusNotFound, errorResponse{Message: "Wallet not found"})
 	}
 
-	responseSchemas := wallet.BuildWalletRead([]wallet.Wallet{w})
+	responseSchemas := wallet.BuildWalletReadList([]wallet.Wallet{w})
 	return utils.JsonResponse(http.StatusOK, responseSchemas[0])
 }

@@ -122,14 +122,18 @@ func TestCreateWalletUsesDefaultCurrencyAndInitialBalance(t *testing.T) {
 	}
 
 	service := NewService(repo, transactionSvc)
-	err := service.CreateWallet(context.Background(), "user-1", "Primary Wallet", "", 250.0, "debit")
+	got, err := service.CreateWallet(context.Background(), "user-1", "Primary Wallet", "", 250.0, "debit")
 	require.NoError(t, err)
+	assert.Equal(t, "Primary Wallet", got.Name)
+	assert.Equal(t, "THB", got.Currency)
+	assert.Equal(t, WalletTypeDebit, got.Type)
+	assert.Equal(t, 250.0, got.Balance)
 }
 
 func TestCreateWalletInvalidTypeReturnsError(t *testing.T) {
 	service := NewService(&mockWalletRepository{}, &mockTransactionService{})
 
-	err := service.CreateWallet(context.Background(), "user-1", "Primary Wallet", "USD", 50.0, "invalid")
+	_, err := service.CreateWallet(context.Background(), "user-1", "Primary Wallet", "USD", 50.0, "invalid")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "Invalid transaction type")
 }
@@ -144,7 +148,7 @@ func TestCreateWalletRejectsEmptyOwnerID(t *testing.T) {
 	}
 
 	service := NewService(repo, &mockTransactionService{})
-	err := service.CreateWallet(context.Background(), "", "Primary Wallet", "USD", 50.0, "debit")
+	_, err := service.CreateWallet(context.Background(), "", "Primary Wallet", "USD", 50.0, "debit")
 
 	require.Error(t, err)
 	assert.Equal(t, "owner ID is required", err.Error())

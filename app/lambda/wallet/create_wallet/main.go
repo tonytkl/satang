@@ -66,7 +66,7 @@ func (handler *createWalletLambda) Handle(ctx context.Context, request events.AP
 	// TODO: Use actual OwnerID from token
 	ownerID := "1"
 
-	err := handler.service.CreateWallet(
+	createdWallet, err := handler.service.CreateWallet(
 		ctx,
 		ownerID,
 		payload.Name,
@@ -78,9 +78,9 @@ func (handler *createWalletLambda) Handle(ctx context.Context, request events.AP
 		return utils.JsonResponse(http.StatusBadRequest, errorResponse{Message: err.Error()})
 	}
 
-	return events.APIGatewayV2HTTPResponse{
-		StatusCode: http.StatusCreated,
-	}, nil
+	walletResponse := wallet.BuildWalletRead(createdWallet)
+
+	return utils.JsonResponse(http.StatusCreated, walletResponse)
 }
 
 func validatePayload(payload createWalletRequest) error {

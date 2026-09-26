@@ -15,14 +15,14 @@ import (
 // MockWalletService is a mock implementation of wallet.Service
 // used to validate the lambda request flow.
 type MockWalletService struct {
-	CreateWalletFunc func(ctx context.Context, ownerID string, name string, currency string, balance float64, walletType string) error
+	CreateWalletFunc func(ctx context.Context, ownerID string, name string, currency string, balance float64, walletType string) (wallet.Wallet, error)
 }
 
-func (m *MockWalletService) CreateWallet(ctx context.Context, ownerID string, name string, currency string, balance float64, walletType string) error {
+func (m *MockWalletService) CreateWallet(ctx context.Context, ownerID string, name string, currency string, balance float64, walletType string) (wallet.Wallet, error) {
 	if m.CreateWalletFunc != nil {
 		return m.CreateWalletFunc(ctx, ownerID, name, currency, balance, walletType)
 	}
-	return nil
+	return wallet.Wallet{}, nil
 }
 
 func (m *MockWalletService) ListWallets(ctx context.Context, ownerID string, nextToken string, limit int32) ([]wallet.Wallet, string, error) {
@@ -53,13 +53,20 @@ func TestHandle_ValidPayload(t *testing.T) {
 	require.NoError(t, err)
 
 	mockService := &MockWalletService{
-		CreateWalletFunc: func(ctx context.Context, ownerID string, name string, currency string, balance float64, walletType string) error {
+		CreateWalletFunc: func(ctx context.Context, ownerID string, name string, currency string, balance float64, walletType string) (wallet.Wallet, error) {
 			assert.Equal(t, "1", ownerID)
 			assert.Equal(t, "Main Wallet", name)
 			assert.Equal(t, "USD", currency)
 			assert.Equal(t, 250.0, balance)
 			assert.Equal(t, "debit", walletType)
-			return nil
+			return wallet.Wallet{
+				ID:       "wallet-1",
+				OwnerID:  ownerID,
+				Name:     name,
+				Currency: currency,
+				Balance:  balance,
+				Type:     wallet.WalletTypeDebit,
+			}, nil
 		},
 	}
 
@@ -117,8 +124,8 @@ func TestHandle_ServiceErrorReturnsBadRequest(t *testing.T) {
 	require.NoError(t, err)
 
 	mockService := &MockWalletService{
-		CreateWalletFunc: func(ctx context.Context, ownerID string, name string, currency string, balance float64, walletType string) error {
-			return assert.AnError
+		CreateWalletFunc: func(ctx context.Context, ownerID string, name string, currency string, balance float64, walletType string) (wallet.Wallet, error) {
+			return wallet.Wallet{}, assert.AnError
 		},
 	}
 

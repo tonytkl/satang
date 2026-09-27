@@ -27,7 +27,6 @@ type createTransactionRequest struct {
 	Type         string  `json:"type"`
 	Amount       float64 `json:"amount"`
 	Date         string  `json:"date"`
-	OwnerID      string  `json:"ownerId"`
 }
 
 type errorResponse struct {
@@ -72,9 +71,8 @@ func (handler *createTransactionLambda) Handle(ctx context.Context, request even
 		return utils.JsonResponse(http.StatusBadRequest, errorResponse{Message: "Date must be RFC3339 or YYYY-MM-DD"})
 	}
 
-	// TODO: Use actual OwnerID from token
-	var OwnerID = "1"
-	payload.OwnerID = OwnerID
+	// TODO: Use actual ownerID from token
+	var ownerID = "1"
 
 	err = handler.service.CreateTransaction(
 		ctx,
@@ -88,7 +86,7 @@ func (handler *createTransactionLambda) Handle(ctx context.Context, request even
 		payload.Type,
 		payload.Amount,
 		date,
-		payload.OwnerID,
+		ownerID,
 	)
 	if err != nil {
 		return utils.JsonResponse(http.StatusBadRequest, errorResponse{Message: err.Error()})

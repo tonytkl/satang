@@ -102,7 +102,8 @@ func (repository *transactionRepository) EditTransaction(ctx context.Context, ow
 		updatedFields["GSI_ByWalletSK"] = sortingKey
 	}
 
-	return repository.baseRepository.Update(ctx, ownerID, transactionID, updatedFields)
+	_, err := repository.baseRepository.Update(ctx, ownerID, transactionID, updatedFields)
+	return err
 }
 
 func (repository *transactionRepository) DeleteTransaction(ctx context.Context, ownerID string, transactionID string) error {

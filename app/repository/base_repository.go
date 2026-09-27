@@ -28,7 +28,7 @@ type BaseRepository[T SatangModel] interface {
 	Save(ctx context.Context, item T) error
 	Get(ctx context.Context, ownerID string, itemID string) (T, error)
 	List(ctx context.Context, ownerID string, nextToken string, limit int32) ([]T, string, error)
-	Update(ctx context.Context, ownerID string, itemID string, changedFields map[string]any) error
+	Update(ctx context.Context, ownerID string, itemID string, changedFields map[string]any) (T, error)
 	Delete(ctx context.Context, ownerID string, itemID string) error
 }
 
@@ -131,17 +131,18 @@ func (repository *baseRepository[T]) List(ctx context.Context, ownerID string, n
 	return items, encodedNextToken, nil
 }
 
-func (repository *baseRepository[T]) Update(ctx context.Context, ownerID string, itemID string, changedFields map[string]any) error {
+func (repository *baseRepository[T]) Update(ctx context.Context, ownerID string, itemID string, changedFields map[string]any) (T, error) {
+	var zero T
 	if ownerID == "" {
-		return errors.New("owner ID is required")
+		return zero, errors.New("owner ID is required")
 	}
 
 	if itemID == "" {
-		return errors.New("item ID is required")
+		return zero, errors.New("item ID is required")
 	}
 
 	if len(changedFields) == 0 {
-		return errors.New("Update payload is required")
+		return zero, errors.New("Update payload is required")
 	}
 
 	key := map[string]any{
@@ -162,7 +163,7 @@ func (repository *baseRepository[T]) Update(ctx context.Context, ownerID string,
 	delete(raw, "CreatedAt")
 
 	if len(raw) == 0 {
-		return errors.New("no mutable fields to update")
+		return zero, errors.New("no mutable fields to update")
 	}
 
 	setParts := make([]string, 0, len(raw))
@@ -186,11 +187,12 @@ func (repository *baseRepository[T]) Update(ctx context.Context, ownerID string,
 	updateExpression := "SET " + strings.Join(setParts, ",")
 	conditionExpression := "attribute_exists(PK) AND attribute_exists(SK) AND ID = :id"
 
-	if err := repository.db.UpdateItem(ctx, repository.tableName, key, updateExpression, exprValues, exprNames, conditionExpression); err != nil {
-		return fmt.Errorf("update item: %w", err)
+	updatedItem := repository.newItem()
+	if err := repository.db.UpdateItem(ctx, repository.tableName, key, updateExpression, exprValues, exprNames, conditionExpression, updatedItem); err != nil {
+		return zero, fmt.Errorf("update item: %w", err)
 	}
 
-	return nil
+	return updatedItem, nil
 }
 
 func (repository *baseRepository[T]) Delete(ctx context.Context, ownerID string, itemID string) error {

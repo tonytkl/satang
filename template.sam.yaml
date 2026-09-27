@@ -73,3 +73,63 @@ Resources:
             ApiId: !Ref SatangLocalHttpApi
             Path: /api/v1.0/transactions/{transaction_id}
             Method: GET
+
+  CreateWalletFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: go1.x
+    Properties:
+      CodeUri: app/lambda/wallet/create_wallet
+      Handler: bootstrap
+      Events:
+        CreateWalletApi:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref SatangLocalHttpApi
+            Path: /api/v1.0/wallets
+            Method: POST
+
+  ListWalletsFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: go1.x
+    Properties:
+      CodeUri: app/lambda/wallet/list_wallets
+      Handler: bootstrap
+      Events:
+        ListWalletsApi:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref SatangLocalHttpApi
+            Path: /api/v1.0/wallets
+            Method: GET
+
+  GetWalletFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: go1.x
+    Properties:
+      CodeUri: app/lambda/wallet/get_wallet
+      Handler: bootstrap
+      Events:
+        GetWalletApi:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref SatangLocalHttpApi
+            Path: /api/v1.0/wallets/{wallet_id}
+            Method: GET
+  
+  EditWalletFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: go1.x
+    Properties:
+      CodeUri: app/lambda/wallet/edit_wallet
+      Handler: bootstrap
+      Events:
+        EditWalletApi:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref SatangLocalHttpApi
+            Path: /api/v1.0/wallets/{wallet_id}
+            Method: PATCH

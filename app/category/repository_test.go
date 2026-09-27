@@ -11,7 +11,7 @@ import (
 
 type mockCategoryDynamoDB struct {
 	putItemFn                  func(ctx context.Context, table string, item any) error
-	updateItemFn               func(ctx context.Context, table string, key map[string]any, updateExpression string, expressionValues map[string]any, expressionNames map[string]string, conditionExpression string) error
+	updateItemFn               func(ctx context.Context, table string, key map[string]any, updateExpression string, expressionValues map[string]any, expressionNames map[string]string, conditionExpression string, out any) error
 	getItemFn                  func(ctx context.Context, table string, key map[string]any, out any) error
 	deleteItemFn               func(ctx context.Context, table string, key map[string]any) error
 	queryItemsFn               func(ctx context.Context, table string, keyConditionExpression string, expressionValues map[string]any, indexName string, filterExpression string, out any) error
@@ -28,9 +28,9 @@ func (m *mockCategoryDynamoDB) PutItem(ctx context.Context, table string, item a
 	return nil
 }
 
-func (m *mockCategoryDynamoDB) UpdateItem(ctx context.Context, table string, key map[string]any, updateExpression string, expressionValues map[string]any, expressionNames map[string]string, conditionExpression string) error {
+func (m *mockCategoryDynamoDB) UpdateItem(ctx context.Context, table string, key map[string]any, updateExpression string, expressionValues map[string]any, expressionNames map[string]string, conditionExpression string, out any) error {
 	if m.updateItemFn != nil {
-		return m.updateItemFn(ctx, table, key, updateExpression, expressionValues, expressionNames, conditionExpression)
+		return m.updateItemFn(ctx, table, key, updateExpression, expressionValues, expressionNames, conditionExpression, out)
 	}
 	return nil
 }
@@ -137,7 +137,7 @@ func TestCategoryRepositoryGetCategory(t *testing.T) {
 
 func TestCategoryRepositoryEditCategory(t *testing.T) {
 	db := &mockCategoryDynamoDB{
-		updateItemFn: func(_ context.Context, table string, key map[string]any, updateExpression string, expressionValues map[string]any, _ map[string]string, conditionExpression string) error {
+		updateItemFn: func(_ context.Context, table string, key map[string]any, updateExpression string, expressionValues map[string]any, _ map[string]string, conditionExpression string, _ any) error {
 			require.Equal(t, "categories", table)
 			assert.Equal(t, "USER#owner-1", key["PK"])
 			assert.Equal(t, "CATEGORY#category-1", key["SK"])

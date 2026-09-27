@@ -4,6 +4,7 @@ resource "aws_apigatewayv2_api" "satang_api" {
 }
 
 locals {
+  # Transaction routes
   transaction_routes = {
     create_transaction = {
       method                  = "POST"
@@ -28,9 +29,37 @@ locals {
     }
   }
 
-  # Keep wallet routes as a separate map so they can be enabled when wallet
-  # Lambda functions are added to local.lambda_functions.
-  wallet_routes = {}
+  # Wallet routes
+  wallet_routes = {
+    create_wallet = {
+      method                  = "POST"
+      path                    = "/api/v1.0/wallets"
+      integration_uri         = module.lambdas["create_wallet"].invoke_arn
+      lambda_function_name    = module.lambdas["create_wallet"].function_name
+      permission_statement_id = "AllowExecutionFromAPIGatewayCreateWallet"
+    }
+    get_wallet = {
+      method                  = "GET"
+      path                    = "/api/v1.0/wallets/{wallet_id}"
+      integration_uri         = module.lambdas["get_wallet"].invoke_arn
+      lambda_function_name    = module.lambdas["get_wallet"].function_name
+      permission_statement_id = "AllowExecutionFromAPIGatewayGetWallet"
+    }
+    list_wallets = {
+      method                  = "GET"
+      path                    = "/api/v1.0/wallets"
+      integration_uri         = module.lambdas["list_wallets"].invoke_arn
+      lambda_function_name    = module.lambdas["list_wallets"].function_name
+      permission_statement_id = "AllowExecutionFromAPIGatewayListWallets"
+    }
+    edit_wallet = {
+      method                  = "PATCH"
+      path                    = "/api/v1.0/wallets/{wallet_id}"
+      integration_uri         = module.lambdas["edit_wallet"].invoke_arn
+      lambda_function_name    = module.lambdas["edit_wallet"].function_name
+      permission_statement_id = "AllowExecutionFromAPIGatewayEditWallet"
+    }
+  }
 
   api_routes = merge(local.transaction_routes, local.wallet_routes)
 }

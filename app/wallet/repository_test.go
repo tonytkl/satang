@@ -11,7 +11,7 @@ import (
 
 type mockWalletDynamoDB struct {
 	putItemFn                  func(ctx context.Context, table string, item any) error
-	updateItemFn               func(ctx context.Context, table string, key map[string]any, updateExpression string, expressionValues map[string]any, expressionNames map[string]string, conditionExpression string) error
+	updateItemFn               func(ctx context.Context, table string, key map[string]any, updateExpression string, expressionValues map[string]any, expressionNames map[string]string, conditionExpression string, out any) error
 	getItemFn                  func(ctx context.Context, table string, key map[string]any, out any) error
 	deleteItemFn               func(ctx context.Context, table string, key map[string]any) error
 	queryItemsFn               func(ctx context.Context, table string, keyConditionExpression string, expressionValues map[string]any, indexName string, filterExpression string, out any) error
@@ -28,9 +28,9 @@ func (m *mockWalletDynamoDB) PutItem(ctx context.Context, table string, item any
 	return nil
 }
 
-func (m *mockWalletDynamoDB) UpdateItem(ctx context.Context, table string, key map[string]any, updateExpression string, expressionValues map[string]any, expressionNames map[string]string, conditionExpression string) error {
+func (m *mockWalletDynamoDB) UpdateItem(ctx context.Context, table string, key map[string]any, updateExpression string, expressionValues map[string]any, expressionNames map[string]string, conditionExpression string, out any) error {
 	if m.updateItemFn != nil {
-		return m.updateItemFn(ctx, table, key, updateExpression, expressionValues, expressionNames, conditionExpression)
+		return m.updateItemFn(ctx, table, key, updateExpression, expressionValues, expressionNames, conditionExpression, out)
 	}
 	return nil
 }
@@ -83,7 +83,7 @@ func TestWalletRepositoryCreateWallet(t *testing.T) {
 	}
 
 	repo := NewRepository(db, "wallets")
-	err := repo.CreateWallet(context.Background(), &Wallet{ID: "wallet-1", OwnerID: "owner-1", Name: "Cash"})
+	err := repo.CreateWallet(context.Background(), Wallet{ID: "wallet-1", OwnerID: "owner-1", Name: "Cash"})
 	require.NoError(t, err)
 }
 
@@ -113,44 +113,77 @@ func TestWalletRepositoryListWallets(t *testing.T) {
 }
 
 func TestWalletRepositoryGetWallet(t *testing.T) {
-	db := &mockWalletDynamoDB{
-		getItemFn: func(_ context.Context, table string, key map[string]any, out any) error {
-			require.Equal(t, "wallets", table)
-			assert.Equal(t, "USER#owner-1", key["PK"])
-			assert.Equal(t, "WALLET#wallet-1", key["SK"])
+	t.Run("returns wallet when found", func(t *testing.T) {
+		db := &mockWalletDynamoDB{
+			getItemFn: func(_ context.Context, table string, key map[string]any, out any) error {
+				require.Equal(t, "wallets", table)
+				assert.Equal(t, "USER#owner-1", key["PK"])
+				assert.Equal(t, "WALLET#wallet-1", key["SK"])
 
-			wallet, ok := out.(*Wallet)
-			require.True(t, ok)
-			wallet.ID = "wallet-1"
-			wallet.OwnerID = "owner-1"
-			wallet.Name = "Cash"
-			return nil
-		},
-	}
+				wallet, ok := out.(*Wallet)
+				require.True(t, ok)
+				wallet.ID = "wallet-1"
+				wallet.OwnerID = "owner-1"
+				wallet.Name = "Cash"
+				return nil
+			},
+		}
 
-	repo := NewRepository(db, "wallets")
-	got, err := repo.GetWallet(context.Background(), "owner-1", "wallet-1")
-	require.NoError(t, err)
-	require.NotNil(t, got)
-	assert.Equal(t, "wallet-1", got.ID)
+		repo := NewRepository(db, "wallets")
+		got, err := repo.GetWallet(context.Background(), "owner-1", "wallet-1")
+		require.NoError(t, err)
+		assert.Equal(t, "wallet-1", got.ID)
+	})
+
+	t.Run("returns ErrWalletNotFound when item is missing", func(t *testing.T) {
+		db := &mockWalletDynamoDB{
+			getItemFn: func(_ context.Context, table string, key map[string]any, out any) error {
+				return clients.ErrItemNotFound
+			},
+		}
+
+		repo := NewRepository(db, "wallets")
+		got, err := repo.GetWallet(context.Background(), "owner-1", "wallet-1")
+
+		require.ErrorIs(t, err, ErrWalletNotFound)
+		assert.Equal(t, Wallet{}, got)
+	})
 }
 
 func TestWalletRepositoryEditWallet(t *testing.T) {
 	db := &mockWalletDynamoDB{
-		updateItemFn: func(_ context.Context, table string, key map[string]any, updateExpression string, expressionValues map[string]any, _ map[string]string, conditionExpression string) error {
+		updateItemFn: func(_ context.Context, table string, key map[string]any, updateExpression string, expressionValues map[string]any, _ map[string]string, conditionExpression string, out any) error {
 			require.Equal(t, "wallets", table)
 			assert.Equal(t, "USER#owner-1", key["PK"])
 			assert.Equal(t, "WALLET#wallet-1", key["SK"])
 			assert.Contains(t, updateExpression, "SET")
 			assert.Equal(t, "wallet-1", expressionValues[":id"])
 			assert.Equal(t, "attribute_exists(PK) AND attribute_exists(SK) AND ID = :id", conditionExpression)
+			updated := out.(*Wallet)
+			updated.ID = "wallet-1"
+			updated.OwnerID = "owner-1"
+			updated.Name = "Updated"
 			return nil
 		},
 	}
 
 	repo := NewRepository(db, "wallets")
-	err := repo.EditWallet(context.Background(), "owner-1", "wallet-1", map[string]any{"Name": "Updated"})
+	got, err := repo.EditWallet(context.Background(), "owner-1", "wallet-1", map[string]any{"Name": "Updated"})
 	require.NoError(t, err)
+	assert.Equal(t, "Updated", got.Name)
+}
+
+func TestWalletRepositoryEditWalletNotFound(t *testing.T) {
+	db := &mockWalletDynamoDB{
+		updateItemFn: func(_ context.Context, _ string, _ map[string]any, _ string, _ map[string]any, _ map[string]string, _ string, _ any) error {
+			return clients.ErrItemNotFound
+		},
+	}
+
+	repo := NewRepository(db, "wallets")
+	_, err := repo.EditWallet(context.Background(), "owner-1", "missing-wallet", map[string]any{"Name": "Updated"})
+
+	require.ErrorIs(t, err, ErrWalletNotFound)
 }
 
 func TestWalletRepositoryDeleteWallet(t *testing.T) {

@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-type TransactionSchemas struct {
+type TransactionRead struct {
 	ID           string          `json:"id"`
 	WalletID     string          `json:"walletId"`
 	WalletName   string          `json:"walletName,omitempty"`
@@ -24,11 +24,11 @@ type TransactionSchemas struct {
 	UpdatedAt    time.Time       `json:"updatedAt"`
 }
 
-// BuildTransactionSchemas maps model transactions to response schemas and validates required fields.
-func BuildTransactionSchemas(transactions []Transaction) ([]TransactionSchemas, error) {
-	responseTransactions := make([]TransactionSchemas, 0, len(transactions))
+// BuildTransactionRead maps model transactions to response schemas and validates required fields.
+func BuildTransactionRead(transactions []Transaction) ([]TransactionRead, error) {
+	responseTransactions := make([]TransactionRead, 0, len(transactions))
 	for _, tx := range transactions {
-		schemaTransaction := TransactionSchemas{
+		schemaTransaction := TransactionRead{
 			ID:           tx.ID,
 			WalletID:     tx.WalletID,
 			WalletName:   tx.WalletName,
@@ -55,7 +55,7 @@ func BuildTransactionSchemas(transactions []Transaction) ([]TransactionSchemas, 
 	return responseTransactions, nil
 }
 
-func validateTransactionSchema(transaction TransactionSchemas) error {
+func validateTransactionSchema(transaction TransactionRead) error {
 	if strings.TrimSpace(transaction.ID) == "" {
 		return errors.New("id is required")
 	}

@@ -29,9 +29,9 @@ type Wallet struct {
 	UpdatedAt time.Time  `dynamodbav:"UpdatedAt"`
 }
 
-func NewWallet(id string, ownerID string, name string, currency string, walletType WalletType) *Wallet {
+func NewWallet(id string, ownerID string, name string, currency string, walletType WalletType) Wallet {
 	now := time.Now().UTC()
-	return &Wallet{
+	return Wallet{
 		PK:        "USER#" + ownerID,
 		SK:        "WALLET#" + id,
 		ID:        id,

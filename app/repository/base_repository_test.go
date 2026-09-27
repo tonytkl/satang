@@ -56,7 +56,7 @@ func (model *testModel) GetOwnerID() string {
 // mockDynamoDB is a test double for clients.DynamoDBClient.
 type mockDynamoDB struct {
 	putItemFn                  func(ctx context.Context, table string, item any) error
-	updateItemFn               func(ctx context.Context, table string, key map[string]any, updateExpression string, expressionValues map[string]any, expressionNames map[string]string, conditionExpression string) error
+	updateItemFn               func(ctx context.Context, table string, key map[string]any, updateExpression string, expressionValues map[string]any, expressionNames map[string]string, conditionExpression string, out any) error
 	getItemFn                  func(ctx context.Context, table string, key map[string]any, out any) error
 	deleteItemFn               func(ctx context.Context, table string, key map[string]any) error
 	queryItemsFn               func(ctx context.Context, table string, keyConditionExpression string, expressionValues map[string]any, indexName string, filterExpression string, out any) error
@@ -73,9 +73,9 @@ func (m *mockDynamoDB) PutItem(ctx context.Context, table string, item any) erro
 	return nil
 }
 
-func (m *mockDynamoDB) UpdateItem(ctx context.Context, table string, key map[string]any, updateExpression string, expressionValues map[string]any, expressionNames map[string]string, conditionExpression string) error {
+func (m *mockDynamoDB) UpdateItem(ctx context.Context, table string, key map[string]any, updateExpression string, expressionValues map[string]any, expressionNames map[string]string, conditionExpression string, out any) error {
 	if m.updateItemFn != nil {
-		return m.updateItemFn(ctx, table, key, updateExpression, expressionValues, expressionNames, conditionExpression)
+		return m.updateItemFn(ctx, table, key, updateExpression, expressionValues, expressionNames, conditionExpression, out)
 	}
 	return nil
 }
@@ -299,13 +299,17 @@ func TestBaseRepositoryList_PropagatesDynamoDBError(t *testing.T) {
 
 func TestBaseRepositoryUpdate_Success(t *testing.T) {
 	db := &mockDynamoDB{
-		updateItemFn: func(_ context.Context, table string, key map[string]any, updateExpression string, expressionValues map[string]any, expressionNames map[string]string, conditionExpression string) error {
+		updateItemFn: func(_ context.Context, table string, key map[string]any, updateExpression string, expressionValues map[string]any, expressionNames map[string]string, conditionExpression string, out any) error {
 			require.Equal(t, "wallets", table)
 			assert.Equal(t, "USER#owner-1", key["PK"])
 			assert.Equal(t, "WALLET#wallet-1", key["SK"])
 			assert.Contains(t, updateExpression, "SET")
 			assert.Equal(t, "attribute_exists(PK) AND attribute_exists(SK) AND ID = :id", conditionExpression)
 			assert.Equal(t, "wallet-1", expressionValues[":id"])
+			updated := out.(*testModel)
+			updated.ID = "wallet-1"
+			updated.OwnerID = "owner-1"
+			updated.Name = "Updated Name"
 			return nil
 		},
 	}
@@ -315,15 +319,16 @@ func TestBaseRepositoryUpdate_Success(t *testing.T) {
 		"Name": "Updated Name",
 	}
 
-	err := repo.Update(context.Background(), "owner-1", "wallet-1", changedFields)
+	got, err := repo.Update(context.Background(), "owner-1", "wallet-1", changedFields)
 	require.NoError(t, err)
+	assert.Equal(t, "Updated Name", got.Name)
 }
 
 func TestBaseRepositoryUpdate_EmptyOwnerIDReturnsError(t *testing.T) {
 	repo := newTestRepo(&mockDynamoDB{})
 	changedFields := map[string]any{"Name": "Updated Name"}
 
-	err := repo.Update(context.Background(), "", "wallet-1", changedFields)
+	_, err := repo.Update(context.Background(), "", "wallet-1", changedFields)
 	require.EqualError(t, err, "owner ID is required")
 }
 
@@ -331,27 +336,27 @@ func TestBaseRepositoryUpdate_EmptyItemIDReturnsError(t *testing.T) {
 	repo := newTestRepo(&mockDynamoDB{})
 	changedFields := map[string]any{"Name": "Updated Name"}
 
-	err := repo.Update(context.Background(), "owner-1", "", changedFields)
+	_, err := repo.Update(context.Background(), "owner-1", "", changedFields)
 	require.EqualError(t, err, "item ID is required")
 }
 
 func TestBaseRepositoryUpdate_NilItemReturnsError(t *testing.T) {
 	repo := newTestRepo(&mockDynamoDB{})
 
-	err := repo.Update(context.Background(), "owner-1", "wallet-1", nil)
+	_, err := repo.Update(context.Background(), "owner-1", "wallet-1", nil)
 	require.EqualError(t, err, "Update payload is required")
 }
 
 func TestBaseRepositoryUpdate_EmptyPayloadReturnsError(t *testing.T) {
 	repo := newTestRepo(&mockDynamoDB{})
 
-	err := repo.Update(context.Background(), "owner-1", "wallet-1", map[string]any{})
+	_, err := repo.Update(context.Background(), "owner-1", "wallet-1", map[string]any{})
 	require.EqualError(t, err, "Update payload is required")
 }
 
 func TestBaseRepositoryUpdate_PropagatesDynamoDBError(t *testing.T) {
 	db := &mockDynamoDB{
-		updateItemFn: func(_ context.Context, _ string, _ map[string]any, _ string, _ map[string]any, _ map[string]string, _ string) error {
+		updateItemFn: func(_ context.Context, _ string, _ map[string]any, _ string, _ map[string]any, _ map[string]string, _ string, _ any) error {
 			return errors.New("conditional check failed")
 		},
 	}
@@ -359,7 +364,7 @@ func TestBaseRepositoryUpdate_PropagatesDynamoDBError(t *testing.T) {
 	repo := newTestRepo(db)
 	changedFields := map[string]any{"Name": "Cash"}
 
-	err := repo.Update(context.Background(), "owner-1", "wallet-1", changedFields)
+	_, err := repo.Update(context.Background(), "owner-1", "wallet-1", changedFields)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "update item")
 	assert.Contains(t, err.Error(), "conditional check failed")

@@ -7,8 +7,8 @@ import "time"
 //
 //	PK = "USER#<ID>"
 //	SK = "#METADATA#<ID>"
-//	GSI_PK = "USER_EMAIL#<Email>"
-//	GSI_SK = "USER#<ID>"
+//	GSI1_PK = "USER_EMAIL#<Email>"
+//	GSI1_SK = "USER#<ID>"
 
 type User struct {
 	PK        string    `dynamodbav:"PK"`
@@ -18,8 +18,8 @@ type User struct {
 	Name      string    `dynamodbav:"Name"`
 	Email     string    `dynamodbav:"Email"`
 	ID        string    `dynamodbav:"ID"`
-	GSISK     string    `dynamodbav:"GSI_SK"`
-	GSIPK     string    `dynamodbav:"GSI_PK"`
+	GSISK     string    `dynamodbav:"GSI1_SK"`
+	GSIPK     string    `dynamodbav:"GSI1_PK"`
 }
 
 func NewUser(id, name, email string) *User {

@@ -42,7 +42,8 @@ func (categoryRepository *categoryRepository) GetCategory(ctx context.Context, o
 }
 
 func (categoryRepository *categoryRepository) EditCategory(ctx context.Context, ownerID string, categoryID string, changedFields map[string]any) error {
-	return categoryRepository.baseRepository.Update(ctx, ownerID, categoryID, changedFields)
+	_, err := categoryRepository.baseRepository.Update(ctx, ownerID, categoryID, changedFields)
+	return err
 }
 
 func (categoryRepository *categoryRepository) DeleteCategory(ctx context.Context, ownerID string, categoryID string) error {

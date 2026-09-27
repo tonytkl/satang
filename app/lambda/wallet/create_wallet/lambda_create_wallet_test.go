@@ -33,8 +33,8 @@ func (m *MockWalletService) GetWallet(ctx context.Context, ownerID string, walle
 	return wallet.Wallet{}, nil
 }
 
-func (m *MockWalletService) EditWallet(ctx context.Context, ownerID string, walletID string, changedFields map[string]any) error {
-	return nil
+func (m *MockWalletService) EditWallet(ctx context.Context, ownerID string, walletID string, changedFields map[string]any) (wallet.Wallet, error) {
+	return wallet.Wallet{}, nil
 }
 
 func (m *MockWalletService) SetActiveWallet(ctx context.Context, ownerID string, walletID string, isActive bool) error {

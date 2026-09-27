@@ -14,7 +14,7 @@ import (
 
 type mockDynamoDB struct {
 	putItemFn                  func(ctx context.Context, table string, item any) error
-	updateItemFn               func(ctx context.Context, table string, key map[string]any, updateExpression string, expressionValues map[string]any, expressionNames map[string]string, conditionExpression string) error
+	updateItemFn               func(ctx context.Context, table string, key map[string]any, updateExpression string, expressionValues map[string]any, expressionNames map[string]string, conditionExpression string, out any) error
 	getItemFn                  func(ctx context.Context, table string, key map[string]any, out any) error
 	deleteItemFn               func(ctx context.Context, table string, key map[string]any) error
 	queryItemsFn               func(ctx context.Context, table string, keyConditionExpression string, expressionValues map[string]any, indexName string, filterExpression string, out any) error
@@ -31,9 +31,9 @@ func (m *mockDynamoDB) PutItem(ctx context.Context, table string, item any) erro
 	return nil
 }
 
-func (m *mockDynamoDB) UpdateItem(ctx context.Context, table string, key map[string]any, updateExpression string, expressionValues map[string]any, expressionNames map[string]string, conditionExpression string) error {
+func (m *mockDynamoDB) UpdateItem(ctx context.Context, table string, key map[string]any, updateExpression string, expressionValues map[string]any, expressionNames map[string]string, conditionExpression string, out any) error {
 	if m.updateItemFn != nil {
-		return m.updateItemFn(ctx, table, key, updateExpression, expressionValues, expressionNames, conditionExpression)
+		return m.updateItemFn(ctx, table, key, updateExpression, expressionValues, expressionNames, conditionExpression, out)
 	}
 	return nil
 }
@@ -239,7 +239,7 @@ func TestTransactionRepositoryEditTransactionSuccess(t *testing.T) {
 	updatedDate := time.Date(2026, 4, 20, 12, 0, 0, 0, time.UTC)
 
 	mock := &mockDynamoDB{
-		updateItemFn: func(_ context.Context, table string, key map[string]any, updateExpression string, expressionValues map[string]any, expressionNames map[string]string, conditionExpression string) error {
+		updateItemFn: func(_ context.Context, table string, key map[string]any, updateExpression string, expressionValues map[string]any, expressionNames map[string]string, conditionExpression string, _ any) error {
 			require.Equal(t, "transactions", table)
 			assert.Equal(t, "USER#user-1", key["PK"])
 			assert.Equal(t, "TX#tx-1", key["SK"])
@@ -327,7 +327,7 @@ func TestTransactionRepositoryDBErrorWrapping(t *testing.T) {
 		getItemFn: func(_ context.Context, _ string, _ map[string]any, _ any) error {
 			return dbErr
 		},
-		updateItemFn: func(_ context.Context, _ string, _ map[string]any, _ string, _ map[string]any, _ map[string]string, _ string) error {
+		updateItemFn: func(_ context.Context, _ string, _ map[string]any, _ string, _ map[string]any, _ map[string]string, _ string, _ any) error {
 			return dbErr
 		},
 		deleteItemFn: func(_ context.Context, _ string, _ map[string]any) error {

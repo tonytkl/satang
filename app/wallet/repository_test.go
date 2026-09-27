@@ -11,7 +11,7 @@ import (
 
 type mockWalletDynamoDB struct {
 	putItemFn                  func(ctx context.Context, table string, item any) error
-	updateItemFn               func(ctx context.Context, table string, key map[string]any, updateExpression string, expressionValues map[string]any, expressionNames map[string]string, conditionExpression string) error
+	updateItemFn               func(ctx context.Context, table string, key map[string]any, updateExpression string, expressionValues map[string]any, expressionNames map[string]string, conditionExpression string, out any) error
 	getItemFn                  func(ctx context.Context, table string, key map[string]any, out any) error
 	deleteItemFn               func(ctx context.Context, table string, key map[string]any) error
 	queryItemsFn               func(ctx context.Context, table string, keyConditionExpression string, expressionValues map[string]any, indexName string, filterExpression string, out any) error
@@ -28,9 +28,9 @@ func (m *mockWalletDynamoDB) PutItem(ctx context.Context, table string, item any
 	return nil
 }
 
-func (m *mockWalletDynamoDB) UpdateItem(ctx context.Context, table string, key map[string]any, updateExpression string, expressionValues map[string]any, expressionNames map[string]string, conditionExpression string) error {
+func (m *mockWalletDynamoDB) UpdateItem(ctx context.Context, table string, key map[string]any, updateExpression string, expressionValues map[string]any, expressionNames map[string]string, conditionExpression string, out any) error {
 	if m.updateItemFn != nil {
-		return m.updateItemFn(ctx, table, key, updateExpression, expressionValues, expressionNames, conditionExpression)
+		return m.updateItemFn(ctx, table, key, updateExpression, expressionValues, expressionNames, conditionExpression, out)
 	}
 	return nil
 }
@@ -152,20 +152,25 @@ func TestWalletRepositoryGetWallet(t *testing.T) {
 
 func TestWalletRepositoryEditWallet(t *testing.T) {
 	db := &mockWalletDynamoDB{
-		updateItemFn: func(_ context.Context, table string, key map[string]any, updateExpression string, expressionValues map[string]any, _ map[string]string, conditionExpression string) error {
+		updateItemFn: func(_ context.Context, table string, key map[string]any, updateExpression string, expressionValues map[string]any, _ map[string]string, conditionExpression string, out any) error {
 			require.Equal(t, "wallets", table)
 			assert.Equal(t, "USER#owner-1", key["PK"])
 			assert.Equal(t, "WALLET#wallet-1", key["SK"])
 			assert.Contains(t, updateExpression, "SET")
 			assert.Equal(t, "wallet-1", expressionValues[":id"])
 			assert.Equal(t, "attribute_exists(PK) AND attribute_exists(SK) AND ID = :id", conditionExpression)
+			updated := out.(*Wallet)
+			updated.ID = "wallet-1"
+			updated.OwnerID = "owner-1"
+			updated.Name = "Updated"
 			return nil
 		},
 	}
 
 	repo := NewRepository(db, "wallets")
-	err := repo.EditWallet(context.Background(), "owner-1", "wallet-1", map[string]any{"Name": "Updated"})
+	got, err := repo.EditWallet(context.Background(), "owner-1", "wallet-1", map[string]any{"Name": "Updated"})
 	require.NoError(t, err)
+	assert.Equal(t, "Updated", got.Name)
 }
 
 func TestWalletRepositoryDeleteWallet(t *testing.T) {

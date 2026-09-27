@@ -14,7 +14,7 @@ type Repository interface {
 	CreateWallet(ctx context.Context, wallet Wallet) error
 	ListWallets(ctx context.Context, ownerID string, nextToken string, limit int32) ([]Wallet, string, error)
 	GetWallet(ctx context.Context, ownerID string, walletID string) (Wallet, error)
-	EditWallet(ctx context.Context, ownerID string, walletID string, changedFields map[string]any) error
+	EditWallet(ctx context.Context, ownerID string, walletID string, changedFields map[string]any) (Wallet, error)
 	DeleteWallet(ctx context.Context, ownerID string, walletID string) error
 }
 
@@ -67,8 +67,12 @@ func (walletRepository *walletRepository) GetWallet(ctx context.Context, ownerID
 	return *wallet, nil
 }
 
-func (walletRepository *walletRepository) EditWallet(ctx context.Context, ownerID string, walletID string, changedFields map[string]any) error {
-	return walletRepository.baseRepository.Update(ctx, ownerID, walletID, changedFields)
+func (walletRepository *walletRepository) EditWallet(ctx context.Context, ownerID string, walletID string, changedFields map[string]any) (Wallet, error) {
+	updatedWallet, err := walletRepository.baseRepository.Update(ctx, ownerID, walletID, changedFields)
+	if err != nil {
+		return Wallet{}, err
+	}
+	return *updatedWallet, nil
 }
 
 func (walletRepository *walletRepository) DeleteWallet(ctx context.Context, ownerID string, walletID string) error {

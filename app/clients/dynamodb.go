@@ -26,7 +26,7 @@ import (
 // isolated from higher-level application code.
 type DynamoDBClient interface {
 	PutItem(ctx context.Context, table string, item any) error
-	UpdateItem(ctx context.Context, table string, key map[string]any, updateExpression string, expressionValues map[string]any, expressionNames map[string]string, conditionExpression string) error
+	UpdateItem(ctx context.Context, table string, key map[string]any, updateExpression string, expressionValues map[string]any, expressionNames map[string]string, conditionExpression string, out any) error
 	GetItem(ctx context.Context, table string, key map[string]any, out any) error
 	DeleteItem(ctx context.Context, table string, key map[string]any) error
 	QueryItemsWithPagination(ctx context.Context, table string, keyConditionExpression string, expressionValues map[string]any, indexName string, filterExpression string, limit int32, paginationToken string, out any) (string, error)
@@ -97,7 +97,7 @@ func (d *DynamoDB) PutItem(ctx context.Context, table string, item any) error {
 
 // UpdateItem updates an existing item using a DynamoDB update expression.
 // expressionValues should map placeholders like ":amount" to concrete values.
-func (d *DynamoDB) UpdateItem(ctx context.Context, table string, key map[string]any, updateExpression string, expressionValues map[string]any, expressionNames map[string]string, conditionExpression string) error {
+func (d *DynamoDB) UpdateItem(ctx context.Context, table string, key map[string]any, updateExpression string, expressionValues map[string]any, expressionNames map[string]string, conditionExpression string, out any) error {
 	attrKey, err := attributevalue.MarshalMap(key)
 	if err != nil {
 		return fmt.Errorf("marshal key: %w", err)
@@ -112,6 +112,7 @@ func (d *DynamoDB) UpdateItem(ctx context.Context, table string, key map[string]
 		TableName:        &table,
 		Key:              attrKey,
 		UpdateExpression: &updateExpression,
+		ReturnValues:     types.ReturnValueAllNew,
 	}
 
 	input.ExpressionAttributeNames = expressionNames
@@ -124,9 +125,17 @@ func (d *DynamoDB) UpdateItem(ctx context.Context, table string, key map[string]
 		input.ConditionExpression = &conditionExpression
 	}
 
-	_, err = d.client.UpdateItem(ctx, input)
+	result, err := d.client.UpdateItem(ctx, input)
 	if err != nil {
 		return fmt.Errorf("update item: %w", err)
+	}
+	if out != nil {
+		if len(result.Attributes) == 0 {
+			return errors.New("update item returned no attributes")
+		}
+		if err := attributevalue.UnmarshalMap(result.Attributes, out); err != nil {
+			return fmt.Errorf("unmarshal updated item: %w", err)
+		}
 	}
 
 	return nil

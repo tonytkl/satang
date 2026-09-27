@@ -15,7 +15,7 @@ type mockWalletRepository struct {
 	createWalletFn func(ctx context.Context, wallet Wallet) error
 	listWalletsFn  func(ctx context.Context, ownerID string, nextToken string, limit int32) ([]Wallet, string, error)
 	getWalletFn    func(ctx context.Context, ownerID string, walletID string) (Wallet, error)
-	editWalletFn   func(ctx context.Context, ownerID string, walletID string, changedFields map[string]any) error
+	editWalletFn   func(ctx context.Context, ownerID string, walletID string, changedFields map[string]any) (Wallet, error)
 	deleteWalletFn func(ctx context.Context, ownerID string, walletID string) error
 }
 
@@ -42,11 +42,11 @@ func (m *mockWalletRepository) GetWallet(ctx context.Context, ownerID string, wa
 	return Wallet{}, nil
 }
 
-func (m *mockWalletRepository) EditWallet(ctx context.Context, ownerID string, walletID string, changedFields map[string]any) error {
+func (m *mockWalletRepository) EditWallet(ctx context.Context, ownerID string, walletID string, changedFields map[string]any) (Wallet, error) {
 	if m.editWalletFn != nil {
 		return m.editWalletFn(ctx, ownerID, walletID, changedFields)
 	}
-	return nil
+	return Wallet{}, nil
 }
 
 func (m *mockWalletRepository) DeleteWallet(ctx context.Context, ownerID string, walletID string) error {
@@ -257,14 +257,14 @@ func TestEditWalletRejectsProtectedFields(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			repositoryCalled := false
 			repo := &mockWalletRepository{
-				editWalletFn: func(ctx context.Context, ownerID string, walletID string, changedFields map[string]any) error {
+				editWalletFn: func(ctx context.Context, ownerID string, walletID string, changedFields map[string]any) (Wallet, error) {
 					repositoryCalled = true
-					return nil
+					return Wallet{}, nil
 				},
 			}
 
 			svc := &service{repository: repo}
-			err := svc.EditWallet(context.Background(), "user-1", "wallet-1", tc.changedFields)
+			_, err := svc.EditWallet(context.Background(), "user-1", "wallet-1", tc.changedFields)
 
 			require.Error(t, err)
 			assert.Equal(t, tc.expectedError, err.Error())
@@ -279,17 +279,18 @@ func TestEditWalletDelegatesToRepository(t *testing.T) {
 	}
 
 	repo := &mockWalletRepository{
-		editWalletFn: func(ctx context.Context, ownerID string, walletID string, fields map[string]any) error {
+		editWalletFn: func(ctx context.Context, ownerID string, walletID string, fields map[string]any) (Wallet, error) {
 			assert.Equal(t, "user-1", ownerID)
 			assert.Equal(t, "wallet-1", walletID)
 			assert.Equal(t, changedFields, fields)
-			return nil
+			return Wallet{ID: walletID, OwnerID: ownerID, Name: "Updated Wallet"}, nil
 		},
 	}
 
 	svc := &service{repository: repo}
-	err := svc.EditWallet(context.Background(), "user-1", "wallet-1", changedFields)
+	got, err := svc.EditWallet(context.Background(), "user-1", "wallet-1", changedFields)
 	require.NoError(t, err)
+	assert.Equal(t, "Updated Wallet", got.Name)
 }
 
 func TestEditWalletConvertsTypeBeforeRepository(t *testing.T) {
@@ -298,33 +299,34 @@ func TestEditWalletConvertsTypeBeforeRepository(t *testing.T) {
 	}
 
 	repo := &mockWalletRepository{
-		editWalletFn: func(ctx context.Context, ownerID string, walletID string, fields map[string]any) error {
+		editWalletFn: func(ctx context.Context, ownerID string, walletID string, fields map[string]any) (Wallet, error) {
 			assert.Equal(t, "user-1", ownerID)
 			assert.Equal(t, "wallet-1", walletID)
 
 			typeValue, ok := fields["Type"]
 			require.True(t, ok)
 			assert.Equal(t, WalletTypeCredit, typeValue)
-			return nil
+			return Wallet{ID: walletID, OwnerID: ownerID, Type: WalletTypeCredit}, nil
 		},
 	}
 
 	svc := &service{repository: repo}
-	err := svc.EditWallet(context.Background(), "user-1", "wallet-1", changedFields)
+	got, err := svc.EditWallet(context.Background(), "user-1", "wallet-1", changedFields)
 	require.NoError(t, err)
+	assert.Equal(t, WalletTypeCredit, got.Type)
 }
 
 func TestEditWalletRejectsNonStringType(t *testing.T) {
 	repositoryCalled := false
 	repo := &mockWalletRepository{
-		editWalletFn: func(ctx context.Context, ownerID string, walletID string, changedFields map[string]any) error {
+		editWalletFn: func(ctx context.Context, ownerID string, walletID string, changedFields map[string]any) (Wallet, error) {
 			repositoryCalled = true
-			return nil
+			return Wallet{}, nil
 		},
 	}
 
 	svc := &service{repository: repo}
-	err := svc.EditWallet(context.Background(), "user-1", "wallet-1", map[string]any{"Type": 123})
+	_, err := svc.EditWallet(context.Background(), "user-1", "wallet-1", map[string]any{"Type": 123})
 
 	require.Error(t, err)
 	assert.Equal(t, "Type must be a string", err.Error())
@@ -335,13 +337,13 @@ func TestEditWalletReturnsRepositoryError(t *testing.T) {
 	repoErr := errors.New("repository failure")
 
 	repo := &mockWalletRepository{
-		editWalletFn: func(ctx context.Context, ownerID string, walletID string, fields map[string]any) error {
-			return repoErr
+		editWalletFn: func(ctx context.Context, ownerID string, walletID string, fields map[string]any) (Wallet, error) {
+			return Wallet{}, repoErr
 		},
 	}
 
 	svc := &service{repository: repo}
-	err := svc.EditWallet(context.Background(), "user-1", "wallet-1", map[string]any{"Name": "Updated"})
+	_, err := svc.EditWallet(context.Background(), "user-1", "wallet-1", map[string]any{"Name": "Updated"})
 
 	require.Error(t, err)
 	assert.Equal(t, repoErr, err)
@@ -349,11 +351,11 @@ func TestEditWalletReturnsRepositoryError(t *testing.T) {
 
 func TestSetActiveWalletDelegatesToEditWallet(t *testing.T) {
 	repo := &mockWalletRepository{
-		editWalletFn: func(ctx context.Context, ownerID string, walletID string, fields map[string]any) error {
+		editWalletFn: func(ctx context.Context, ownerID string, walletID string, fields map[string]any) (Wallet, error) {
 			assert.Equal(t, "user-1", ownerID)
 			assert.Equal(t, "wallet-1", walletID)
 			assert.Equal(t, map[string]any{"IsActive": true}, fields)
-			return nil
+			return Wallet{}, nil
 		},
 	}
 

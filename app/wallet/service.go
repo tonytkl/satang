@@ -14,7 +14,7 @@ type Service interface {
 	CreateWallet(ctx context.Context, ownerID string, name string, currency string, balance float64, strWalletType string) (Wallet, error)
 	ListWallets(ctx context.Context, ownerID string, nextToken string, limit int32) ([]Wallet, string, error)
 	GetWallet(ctx context.Context, ownerID string, walletID string) (Wallet, error)
-	EditWallet(ctx context.Context, ownerID string, walletID string, changedFields map[string]any) error
+	EditWallet(ctx context.Context, ownerID string, walletID string, changedFields map[string]any) (Wallet, error)
 	SetActiveWallet(ctx context.Context, ownerID string, walletID string, isActive bool) error
 }
 
@@ -114,28 +114,28 @@ func (service *service) GetWallet(ctx context.Context, ownerID string, walletID 
 	)
 }
 
-func (service *service) EditWallet(ctx context.Context, ownerID string, walletID string, changedFields map[string]any) error {
+func (service *service) EditWallet(ctx context.Context, ownerID string, walletID string, changedFields map[string]any) (Wallet, error) {
 	if _, ok := changedFields["OwnerID"]; ok {
-		return errors.New("Owner ID is not updateable")
+		return Wallet{}, errors.New("Owner ID is not updateable")
 	}
 
 	if _, ok := changedFields["Currency"]; ok {
-		return errors.New("Currency is not updateable")
+		return Wallet{}, errors.New("Currency is not updateable")
 	}
 
 	if _, ok := changedFields["Balance"]; ok {
-		return errors.New("Balance is not updateable")
+		return Wallet{}, errors.New("Balance is not updateable")
 	}
 
 	if typeValue, ok := changedFields["Type"]; ok {
 		strCategoryType, ok := typeValue.(string)
 		if !ok {
-			return errors.New("Type must be a string")
+			return Wallet{}, errors.New("Type must be a string")
 		}
 
 		categoryType, err := getWalletType(strCategoryType)
 		if err != nil {
-			return err
+			return Wallet{}, err
 		}
 		changedFields["Type"] = categoryType
 	}
@@ -146,7 +146,8 @@ func (service *service) EditWallet(ctx context.Context, ownerID string, walletID
 func (service *service) SetActiveWallet(ctx context.Context, ownerID string, walletID string, isActive bool) error {
 	changedFields := make(map[string]any, 1)
 	changedFields["IsActive"] = isActive
-	return service.EditWallet(ctx, ownerID, walletID, changedFields)
+	_, err := service.EditWallet(ctx, ownerID, walletID, changedFields)
+	return err
 }
 
 // TODO: Implement delete wallet. Need to define how to do with existing transaction

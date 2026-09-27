@@ -76,6 +76,7 @@ func TestDynamoDBUpdateItem(t *testing.T) {
 		assert.Equal(t, "transactions", payload["TableName"])
 		assert.Equal(t, "SET amount = :amount", payload["UpdateExpression"])
 		assert.Equal(t, "attribute_exists(id)", payload["ConditionExpression"])
+		assert.Equal(t, "ALL_NEW", payload["ReturnValues"])
 
 		key := payload["Key"].(map[string]any)
 		assert.Equal(t, "txn-1", key["id"].(map[string]any)["S"])
@@ -83,9 +84,16 @@ func TestDynamoDBUpdateItem(t *testing.T) {
 		values := payload["ExpressionAttributeValues"].(map[string]any)
 		assert.Equal(t, "99", values[":amount"].(map[string]any)["N"])
 
-		writeJSON(t, writer, map[string]any{})
+		writeJSON(t, writer, map[string]any{
+			"Attributes": map[string]any{
+				"id":      map[string]any{"S": "txn-1"},
+				"user_id": map[string]any{"S": "user-1"},
+				"amount":  map[string]any{"N": "99"},
+			},
+		})
 	})
 
+	var got testTransaction
 	err := client.UpdateItem(
 		context.Background(),
 		"transactions",
@@ -94,8 +102,10 @@ func TestDynamoDBUpdateItem(t *testing.T) {
 		map[string]any{":amount": 99},
 		nil,
 		"attribute_exists(id)",
+		&got,
 	)
 	require.NoError(t, err)
+	assert.Equal(t, testTransaction{ID: "txn-1", UserID: "user-1", Amount: 99}, got)
 }
 
 func TestDynamoDBUpdateItemWithoutOptionalFields(t *testing.T) {
@@ -121,6 +131,7 @@ func TestDynamoDBUpdateItemWithoutOptionalFields(t *testing.T) {
 		map[string]any{},
 		nil,
 		"",
+		nil,
 	)
 	require.NoError(t, err)
 }

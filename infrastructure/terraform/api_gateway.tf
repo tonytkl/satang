@@ -4,7 +4,7 @@ resource "aws_apigatewayv2_api" "satang_api" {
 }
 
 locals {
-  # Transactio routes
+  # Transaction routes
   transaction_routes = {
     create_transaction = {
       method                  = "POST"

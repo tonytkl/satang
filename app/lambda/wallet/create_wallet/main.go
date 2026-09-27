@@ -21,7 +21,7 @@ type createWalletRequest struct {
 	Name       string  `json:"name"`
 	Currency   string  `json:"currency"`
 	Balance    float64 `json:"balance"`
-	WalletType string  `json:"walleyType"`
+	WalletType string  `json:"walletType"`
 }
 
 type errorResponse struct {

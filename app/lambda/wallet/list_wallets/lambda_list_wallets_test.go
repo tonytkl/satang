@@ -108,6 +108,31 @@ func TestListWalletsLambdaHandleInvalidLimit(t *testing.T) {
 	assert.Equal(t, "limit must be a valid integer", payload.Message)
 }
 
+func TestListWalletsLambdaHandleNegativeLimit(t *testing.T) {
+	serviceCalled := false
+	handler := &listWalletsLambda{
+		service: &mockWalletService{
+			listWalletsFunc: func(context.Context, string, string, int32) ([]wallet.Wallet, string, error) {
+				serviceCalled = true
+				return nil, "", nil
+			},
+		},
+	}
+
+	response, err := handler.Handle(context.Background(), events.APIGatewayV2HTTPRequest{
+		QueryStringParameters: map[string]string{"limit": "-1"},
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusBadRequest, response.StatusCode)
+	assert.False(t, serviceCalled)
+
+	var payload errorResponse
+	err = json.Unmarshal([]byte(response.Body), &payload)
+	require.NoError(t, err)
+	assert.Equal(t, "limit must be greater than or equal to 0", payload.Message)
+}
+
 func TestListWalletsLambdaHandleServiceError(t *testing.T) {
 	handler := &listWalletsLambda{
 		service: &mockWalletService{

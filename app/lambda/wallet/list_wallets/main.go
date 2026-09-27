@@ -65,6 +65,11 @@ func (handler *listWalletsLambda) Handle(ctx context.Context, request events.API
 		if err != nil {
 			return utils.JsonResponse(http.StatusBadRequest, errorResponse{Message: "limit must be a valid integer"})
 		}
+
+		if parsedLimit < 0 {
+			return utils.JsonResponse(http.StatusBadRequest, errorResponse{Message: "limit must be greater than or equal to 0"})
+		}
+
 		limit = int32(parsedLimit)
 	}
 

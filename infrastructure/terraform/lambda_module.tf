@@ -28,6 +28,10 @@ locals {
       function_name = "satang-list-wallets"
       artifact_path = "../../aws/lambda/list_wallets.zip"
     }
+    edit_wallet = {
+      function_name = "satang-edit-wallet"
+      artifact_path = "../../aws/lambda/edit_wallet.zip"
+    }
   }
   lambda_functions = merge(local.transaction_functions, local.wallet_functions)
 }

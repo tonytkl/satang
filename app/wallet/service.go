@@ -164,6 +164,6 @@ func getWalletType(strWalletType string) (WalletType, error) {
 	case "investment":
 		return WalletTypeInvestment, nil
 	default:
-		return "", errors.New("Invalid transaction type")
+		return "", errors.New("Invalid wallet type")
 	}
 }

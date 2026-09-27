@@ -135,7 +135,7 @@ func TestCreateWalletInvalidTypeReturnsError(t *testing.T) {
 
 	_, err := service.CreateWallet(context.Background(), "user-1", "Primary Wallet", "USD", 50.0, "invalid")
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "Invalid transaction type")
+	assert.Contains(t, err.Error(), "Invalid wallet type")
 }
 
 func TestCreateWalletRejectsEmptyOwnerID(t *testing.T) {

@@ -52,6 +52,13 @@ locals {
       lambda_function_name    = module.lambdas["list_wallets"].function_name
       permission_statement_id = "AllowExecutionFromAPIGatewayListWallets"
     }
+    edit_wallet = {
+      method                  = "PATCH"
+      path                    = "/api/v1.0/wallets/{wallet_id}"
+      integration_uri         = module.lambdas["edit_wallet"].invoke_arn
+      lambda_function_name    = module.lambdas["edit_wallet"].function_name
+      permission_statement_id = "AllowExecutionFromAPIGatewayEditWallet"
+    }
   }
 
   api_routes = merge(local.transaction_routes, local.wallet_routes)

@@ -118,3 +118,18 @@ Resources:
             ApiId: !Ref SatangLocalHttpApi
             Path: /api/v1.0/wallets/{wallet_id}
             Method: GET
+  
+  EditWalletFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: go1.x
+    Properties:
+      CodeUri: app/lambda/wallet/edit_wallet
+      Handler: bootstrap
+      Events:
+        EditWalletApi:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref SatangLocalHttpApi
+            Path: /api/v1.0/wallets/{wallet_id}
+            Method: PATCH

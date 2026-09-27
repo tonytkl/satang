@@ -349,6 +349,19 @@ func TestEditWalletReturnsRepositoryError(t *testing.T) {
 	assert.Equal(t, repoErr, err)
 }
 
+func TestEditWalletReturnsWalletNotFound(t *testing.T) {
+	repo := &mockWalletRepository{
+		editWalletFn: func(context.Context, string, string, map[string]any) (Wallet, error) {
+			return Wallet{}, ErrWalletNotFound
+		},
+	}
+
+	svc := &service{repository: repo}
+	_, err := svc.EditWallet(context.Background(), "user-1", "missing-wallet", map[string]any{"Name": "Updated"})
+
+	require.ErrorIs(t, err, ErrWalletNotFound)
+}
+
 func TestSetActiveWalletDelegatesToEditWallet(t *testing.T) {
 	repo := &mockWalletRepository{
 		editWalletFn: func(ctx context.Context, ownerID string, walletID string, fields map[string]any) (Wallet, error) {

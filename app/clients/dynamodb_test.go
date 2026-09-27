@@ -136,6 +136,29 @@ func TestDynamoDBUpdateItemWithoutOptionalFields(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestDynamoDBUpdateItemConditionalCheckFailed(t *testing.T) {
+	client := newTestClient(t, func(t *testing.T, writer http.ResponseWriter, _ *http.Request, _ map[string]any) {
+		writer.WriteHeader(http.StatusBadRequest)
+		writeJSON(t, writer, map[string]any{
+			"__type":  "com.amazonaws.dynamodb.v20120810#ConditionalCheckFailedException",
+			"message": "The conditional request failed",
+		})
+	})
+
+	err := client.UpdateItem(
+		context.Background(),
+		"wallets",
+		map[string]any{"PK": "USER#owner-1", "SK": "WALLET#missing"},
+		"SET #name = :name",
+		map[string]any{":name": "Updated"},
+		map[string]string{"#name": "Name"},
+		"attribute_exists(PK)",
+		nil,
+	)
+
+	require.ErrorIs(t, err, ErrItemNotFound)
+}
+
 func TestDynamoDBQueryItemsWithIndex(t *testing.T) {
 	client := newTestClient(t, func(t *testing.T, writer http.ResponseWriter, request *http.Request, payload map[string]any) {
 		assert.Equal(t, "DynamoDB_20120810.Query", request.Header.Get("X-Amz-Target"))

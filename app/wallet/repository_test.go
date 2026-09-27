@@ -173,6 +173,19 @@ func TestWalletRepositoryEditWallet(t *testing.T) {
 	assert.Equal(t, "Updated", got.Name)
 }
 
+func TestWalletRepositoryEditWalletNotFound(t *testing.T) {
+	db := &mockWalletDynamoDB{
+		updateItemFn: func(_ context.Context, _ string, _ map[string]any, _ string, _ map[string]any, _ map[string]string, _ string, _ any) error {
+			return clients.ErrItemNotFound
+		},
+	}
+
+	repo := NewRepository(db, "wallets")
+	_, err := repo.EditWallet(context.Background(), "owner-1", "missing-wallet", map[string]any{"Name": "Updated"})
+
+	require.ErrorIs(t, err, ErrWalletNotFound)
+}
+
 func TestWalletRepositoryDeleteWallet(t *testing.T) {
 	db := &mockWalletDynamoDB{
 		deleteItemFn: func(_ context.Context, table string, key map[string]any) error {

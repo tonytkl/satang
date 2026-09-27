@@ -127,6 +127,10 @@ func (d *DynamoDB) UpdateItem(ctx context.Context, table string, key map[string]
 
 	result, err := d.client.UpdateItem(ctx, input)
 	if err != nil {
+		var conditionalCheckFailed *types.ConditionalCheckFailedException
+		if errors.As(err, &conditionalCheckFailed) {
+			return fmt.Errorf("%w: %v", ErrItemNotFound, err)
+		}
 		return fmt.Errorf("update item: %w", err)
 	}
 	if out != nil {

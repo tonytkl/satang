@@ -70,6 +70,9 @@ func (walletRepository *walletRepository) GetWallet(ctx context.Context, ownerID
 func (walletRepository *walletRepository) EditWallet(ctx context.Context, ownerID string, walletID string, changedFields map[string]any) (Wallet, error) {
 	updatedWallet, err := walletRepository.baseRepository.Update(ctx, ownerID, walletID, changedFields)
 	if err != nil {
+		if errors.Is(err, clients.ErrItemNotFound) {
+			return Wallet{}, ErrWalletNotFound
+		}
 		return Wallet{}, err
 	}
 	return *updatedWallet, nil

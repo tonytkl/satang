@@ -26,6 +26,8 @@ type SatangModel interface {
 
 type BaseRepository[T SatangModel] interface {
 	Save(ctx context.Context, item T) error
+	// PrepareSave builds an insert op (fails if the item exists) for use in an atomic write.
+	PrepareSave(item T) clients.WriteOp
 	Get(ctx context.Context, ownerID string, itemID string) (T, error)
 	List(ctx context.Context, ownerID string, nextToken string, limit int32) ([]T, string, error)
 	Update(ctx context.Context, ownerID string, itemID string, changedFields map[string]any) (T, error)
@@ -48,7 +50,7 @@ func NewBaseRepository[T SatangModel](db clients.DynamoDBClient, tableName strin
 	}
 }
 
-func (repository *baseRepository[T]) Save(ctx context.Context, item T) error {
+func (repository *baseRepository[T]) prepareItem(item T) {
 	item.SetPK(utils.GetPartitionKey("USER", item.GetOwnerID()))
 	item.SetSK(utils.GetPartitionKey(repository.skModel, item.GetID()))
 
@@ -59,6 +61,21 @@ func (repository *baseRepository[T]) Save(ctx context.Context, item T) error {
 	if item.GetUpdatedAt().IsZero() {
 		item.SetUpdatedAt(time.Now().UTC())
 	}
+}
+
+func (repository *baseRepository[T]) PrepareSave(item T) clients.WriteOp {
+	repository.prepareItem(item)
+
+	return clients.WriteOp{
+		Kind:      clients.WritePut,
+		Table:     repository.tableName,
+		Item:      item,
+		Condition: "attribute_not_exists(PK)",
+	}
+}
+
+func (repository *baseRepository[T]) Save(ctx context.Context, item T) error {
+	repository.prepareItem(item)
 
 	putItemErr := repository.db.PutItem(ctx, repository.tableName, item)
 

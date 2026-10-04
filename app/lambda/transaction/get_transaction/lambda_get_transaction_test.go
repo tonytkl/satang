@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"github.com/tonytkl/satang/clients"
 	"testing"
 	"time"
 
@@ -152,4 +153,8 @@ func TestGetTransactionLambda_Handle(t *testing.T) {
 			}
 		})
 	}
+}
+
+func (m *mockTransactionService) PrepareCreateTransaction(walletID string, walletName string, categoryID string, categoryName string, description string, currency string, imageURL string, txType string, amount float64, date time.Time, ownerID string) (clients.WriteOp, error) {
+	return clients.WriteOp{}, nil
 }

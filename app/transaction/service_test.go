@@ -3,6 +3,7 @@ package transaction
 import (
 	"context"
 	"errors"
+	"github.com/tonytkl/satang/clients"
 	"testing"
 	"time"
 
@@ -476,4 +477,8 @@ func TestDeleteTransactionDelegatesToRepository(t *testing.T) {
 	service := NewService(mock)
 	err := service.DeleteTransaction(context.Background(), "user-1", "tx-1")
 	require.NoError(t, err)
+}
+
+func (m *mockTransactionRepository) PrepareCreateTransaction(transaction *Transaction) clients.WriteOp {
+	return clients.WriteOp{Kind: clients.WritePut, Table: "transactions", Item: transaction}
 }

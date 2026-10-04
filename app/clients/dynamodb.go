@@ -33,6 +33,34 @@ type DynamoDBClient interface {
 	ScanItems(ctx context.Context, table string, filterExpression string, expressionValues map[string]any, out any) error
 }
 
+// WriteKind identifies the action performed by a WriteOp.
+type WriteKind int
+
+const (
+	WritePut WriteKind = iota
+	WriteUpdate
+	WriteDelete
+	WriteCheck
+)
+
+// WriteOp describes one action of an atomic multi-item write.
+// Item is used by WritePut; Key is used by the other kinds.
+type WriteOp struct {
+	Kind       WriteKind
+	Table      string
+	Item       any
+	Key        map[string]any
+	UpdateExpr string
+	Values     map[string]any
+	Names      map[string]string
+	Condition  string
+}
+
+// TransactionalWriter commits several write operations atomically.
+type TransactionalWriter interface {
+	TransactWrite(ctx context.Context, ops ...WriteOp) error
+}
+
 // DynamoDB is a thin wrapper around the AWS SDK v2 DynamoDB client.
 // It marshals items using the attributevalue package and translates DynamoDB
 // operations into repository-friendly method calls.
@@ -273,6 +301,103 @@ func (d *DynamoDB) ScanItems(ctx context.Context, table, filterExpression string
 	}
 
 	return nil
+}
+
+// TransactWrite applies all ops atomically: either every op succeeds or none is applied.
+// DynamoDB allows at most 100 ops per call and one op per item key.
+func (d *DynamoDB) TransactWrite(ctx context.Context, ops ...WriteOp) error {
+	if len(ops) == 0 {
+		return errors.New("transact write: no operations")
+	}
+
+	items := make([]types.TransactWriteItem, 0, len(ops))
+	for _, op := range ops {
+		item, err := op.toTransactWriteItem()
+		if err != nil {
+			return err
+		}
+		items = append(items, item)
+	}
+
+	if _, err := d.client.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{TransactItems: items}); err != nil {
+		return fmt.Errorf("transact write items: %w", err)
+	}
+
+	return nil
+}
+
+func (op WriteOp) toTransactWriteItem() (types.TransactWriteItem, error) {
+	var item types.TransactWriteItem
+
+	var condition *string
+	if op.Condition != "" {
+		condition = &op.Condition
+	}
+
+	values, err := marshalExpressionValues(op.Values)
+	if err != nil {
+		return item, fmt.Errorf("marshal expression values: %w", err)
+	}
+	// DynamoDB rejects empty expression maps.
+	if len(values) == 0 {
+		values = nil
+	}
+	names := op.Names
+	if len(names) == 0 {
+		names = nil
+	}
+
+	if op.Kind == WritePut {
+		attrItem, err := attributevalue.MarshalMap(op.Item)
+		if err != nil {
+			return item, fmt.Errorf("marshal item: %w", err)
+		}
+		item.Put = &types.Put{
+			TableName:                 aws.String(op.Table),
+			Item:                      attrItem,
+			ConditionExpression:       condition,
+			ExpressionAttributeNames:  names,
+			ExpressionAttributeValues: values,
+		}
+		return item, nil
+	}
+
+	attrKey, err := attributevalue.MarshalMap(op.Key)
+	if err != nil {
+		return item, fmt.Errorf("marshal key: %w", err)
+	}
+
+	switch op.Kind {
+	case WriteUpdate:
+		item.Update = &types.Update{
+			TableName:                 aws.String(op.Table),
+			Key:                       attrKey,
+			UpdateExpression:          aws.String(op.UpdateExpr),
+			ConditionExpression:       condition,
+			ExpressionAttributeNames:  names,
+			ExpressionAttributeValues: values,
+		}
+	case WriteDelete:
+		item.Delete = &types.Delete{
+			TableName:                 aws.String(op.Table),
+			Key:                       attrKey,
+			ConditionExpression:       condition,
+			ExpressionAttributeNames:  names,
+			ExpressionAttributeValues: values,
+		}
+	case WriteCheck:
+		item.ConditionCheck = &types.ConditionCheck{
+			TableName:                 aws.String(op.Table),
+			Key:                       attrKey,
+			ConditionExpression:       condition,
+			ExpressionAttributeNames:  names,
+			ExpressionAttributeValues: values,
+		}
+	default:
+		return item, fmt.Errorf("unknown write kind %d", op.Kind)
+	}
+
+	return item, nil
 }
 
 func marshalExpressionValues(values map[string]any) (map[string]types.AttributeValue, error) {

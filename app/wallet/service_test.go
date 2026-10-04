@@ -3,6 +3,7 @@ package wallet
 import (
 	"context"
 	"errors"
+	"github.com/tonytkl/satang/clients"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -321,4 +322,29 @@ func TestSetActiveWalletDelegatesToEditWallet(t *testing.T) {
 	svc := NewService(repo)
 	err := svc.SetActiveWallet(context.Background(), "user-1", "wallet-1", true)
 	require.NoError(t, err)
+}
+
+func (m *mockWalletRepository) PrepareCreateWallet(wallet *Wallet) clients.WriteOp {
+	return clients.WriteOp{Kind: clients.WritePut, Table: "wallets", Item: wallet}
+}
+
+func TestPrepareCreateWalletReturnsOpWithoutPersisting(t *testing.T) {
+	repo := &mockWalletRepository{
+		createWalletFn: func(ctx context.Context, wallet Wallet) error {
+			t.Fatal("CreateWallet must not be called")
+			return nil
+		},
+	}
+
+	got, op, err := NewService(repo).PrepareCreateWallet("user-1", "Primary", "", 100, "debit")
+	require.NoError(t, err)
+	assert.Equal(t, "THB", got.Currency)
+	assert.Equal(t, 100.0, got.Balance)
+	assert.Equal(t, clients.WritePut, op.Kind)
+	assert.Equal(t, "wallets", op.Table)
+}
+
+func TestPrepareCreateWalletInvalidTypeReturnsError(t *testing.T) {
+	_, _, err := NewService(&mockWalletRepository{}).PrepareCreateWallet("user-1", "Primary", "", 0, "bad")
+	require.Error(t, err)
 }

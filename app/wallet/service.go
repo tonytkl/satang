@@ -5,11 +5,14 @@ import (
 	"errors"
 	"strings"
 
+	"github.com/tonytkl/satang/clients"
 	"github.com/tonytkl/satang/utils"
 )
 
 type Service interface {
 	CreateWallet(ctx context.Context, ownerID string, name string, currency string, balance float64, strWalletType string) (Wallet, error)
+	// PrepareCreateWallet validates and builds the wallet plus a write op, without persisting.
+	PrepareCreateWallet(ownerID string, name string, currency string, balance float64, strWalletType string) (Wallet, clients.WriteOp, error)
 	ListWallets(ctx context.Context, ownerID string, nextToken string, limit int32) ([]Wallet, string, error)
 	GetWallet(ctx context.Context, ownerID string, walletID string) (Wallet, error)
 	EditWallet(ctx context.Context, ownerID string, walletID string, changedFields map[string]any) (Wallet, error)
@@ -27,6 +30,28 @@ func NewService(repository Repository) Service {
 }
 
 func (service *service) CreateWallet(ctx context.Context, ownerID string, name string, currency string, balance float64, strWalletType string) (Wallet, error) {
+	wallet, err := service.buildWallet(ownerID, name, currency, balance, strWalletType)
+	if err != nil {
+		return wallet, err
+	}
+
+	if err := service.repository.CreateWallet(ctx, wallet); err != nil {
+		return wallet, err
+	}
+
+	return wallet, nil
+}
+
+func (service *service) PrepareCreateWallet(ownerID string, name string, currency string, balance float64, strWalletType string) (Wallet, clients.WriteOp, error) {
+	wallet, err := service.buildWallet(ownerID, name, currency, balance, strWalletType)
+	if err != nil {
+		return wallet, clients.WriteOp{}, err
+	}
+
+	return wallet, service.repository.PrepareCreateWallet(&wallet), nil
+}
+
+func (service *service) buildWallet(ownerID string, name string, currency string, balance float64, strWalletType string) (Wallet, error) {
 	var wallet Wallet
 
 	if ownerID == "" {
@@ -51,10 +76,6 @@ func (service *service) CreateWallet(ctx context.Context, ownerID string, name s
 		walletType,
 	)
 	wallet.Balance = balance
-
-	if err := service.repository.CreateWallet(ctx, wallet); err != nil {
-		return wallet, err
-	}
 
 	return wallet, nil
 }

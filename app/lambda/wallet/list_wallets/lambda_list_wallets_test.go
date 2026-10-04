@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"github.com/tonytkl/satang/clients"
 	"net/http"
 	"testing"
 	"time"
@@ -154,3 +155,7 @@ func TestListWalletsLambdaHandleServiceError(t *testing.T) {
 }
 
 var _ wallet.Service = (*mockWalletService)(nil)
+
+func (m *mockWalletService) PrepareCreateWallet(ownerID string, name string, currency string, balance float64, walletType string) (wallet.Wallet, clients.WriteOp, error) {
+	return wallet.Wallet{}, clients.WriteOp{}, nil
+}

@@ -16,6 +16,7 @@ type Repository interface {
 	GetWallet(ctx context.Context, ownerID string, walletID string) (Wallet, error)
 	EditWallet(ctx context.Context, ownerID string, walletID string, changedFields map[string]any) (Wallet, error)
 	DeleteWallet(ctx context.Context, ownerID string, walletID string) error
+	PrepareCreateWallet(wallet *Wallet) clients.WriteOp
 }
 
 type walletRepository struct {
@@ -34,6 +35,10 @@ func NewRepository(db clients.DynamoDBClient, tableName string) Repository {
 
 func (walletRepository *walletRepository) CreateWallet(ctx context.Context, wallet Wallet) error {
 	return walletRepository.baseRepository.Save(ctx, &wallet)
+}
+
+func (walletRepository *walletRepository) PrepareCreateWallet(wallet *Wallet) clients.WriteOp {
+	return walletRepository.baseRepository.PrepareSave(wallet)
 }
 
 func (walletRepository *walletRepository) ListWallets(ctx context.Context, ownerID string, nextToken string, limit int32) ([]Wallet, string, error) {

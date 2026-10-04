@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"github.com/tonytkl/satang/clients"
 	"net/http"
 	"testing"
 	"time"
@@ -526,4 +527,8 @@ func TestValidatePayload_WhitespaceIsInvalid(t *testing.T) {
 			assert.Equal(t, tt.expected, err.Error())
 		})
 	}
+}
+
+func (m *MockTransactionService) PrepareCreateTransaction(walletID string, walletName string, categoryID string, categoryName string, description string, currency string, imageURL string, txType string, amount float64, date time.Time, ownerID string) (clients.WriteOp, error) {
+	return clients.WriteOp{}, nil
 }

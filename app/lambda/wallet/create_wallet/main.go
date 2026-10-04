@@ -32,6 +32,7 @@ type errorResponse struct {
 type createWalletLambda struct {
 	walletService      wallet.Service
 	transactionService transaction.Service
+	writer             clients.TransactionalWriter
 }
 
 func main() {
@@ -50,7 +51,7 @@ func main() {
 	transactionRepository := transaction.NewRepository(db, tableName)
 	transactionService := transaction.NewService(transactionRepository)
 	walletService := wallet.NewService(walletRepository)
-	handler := &createWalletLambda{walletService: walletService, transactionService: transactionService}
+	handler := &createWalletLambda{walletService: walletService, transactionService: transactionService, writer: db}
 
 	lambda.Start(handler.Handle)
 }
@@ -68,8 +69,7 @@ func (handler *createWalletLambda) Handle(ctx context.Context, request events.AP
 	// TODO: Use actual OwnerID from token
 	ownerID := "1"
 
-	createdWallet, err := handler.walletService.CreateWallet(
-		ctx,
+	createdWallet, walletOp, err := handler.walletService.PrepareCreateWallet(
 		ownerID,
 		payload.Name,
 		payload.Currency,
@@ -80,9 +80,10 @@ func (handler *createWalletLambda) Handle(ctx context.Context, request events.AP
 		return utils.JsonResponse(http.StatusBadRequest, errorResponse{Message: err.Error()})
 	}
 
+	ops := []clients.WriteOp{walletOp}
+
 	if payload.Balance != 0 {
-		err := handler.transactionService.CreateTransaction(
-			ctx,
+		transactionOp, err := handler.transactionService.PrepareCreateTransaction(
 			createdWallet.ID,
 			createdWallet.Name,
 			// TODO: Query actual category ID
@@ -97,8 +98,13 @@ func (handler *createWalletLambda) Handle(ctx context.Context, request events.AP
 			ownerID,
 		)
 		if err != nil {
-			return utils.JsonResponse(http.StatusInternalServerError, errorResponse{Message: err.Error()})
+			return utils.JsonResponse(http.StatusBadRequest, errorResponse{Message: err.Error()})
 		}
+		ops = append(ops, transactionOp)
+	}
+
+	if err := handler.writer.TransactWrite(ctx, ops...); err != nil {
+		return utils.JsonResponse(http.StatusInternalServerError, errorResponse{Message: err.Error()})
 	}
 
 	walletResponse := wallet.BuildWalletRead(createdWallet)

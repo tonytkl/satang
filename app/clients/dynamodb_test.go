@@ -55,6 +55,40 @@ func TestDynamoDBGetItemNotFound(t *testing.T) {
 	require.ErrorIs(t, err, ErrItemNotFound)
 }
 
+func TestDynamoDBTransactWrite(t *testing.T) {
+	client := newTestClient(t, func(t *testing.T, writer http.ResponseWriter, request *http.Request, payload map[string]any) {
+		assert.Equal(t, "DynamoDB_20120810.TransactWriteItems", request.Header.Get("X-Amz-Target"))
+
+		items := payload["TransactItems"].([]any)
+		require.Len(t, items, 2)
+
+		put := items[0].(map[string]any)["Put"].(map[string]any)
+		assert.Equal(t, "transactions", put["TableName"])
+		assert.Equal(t, "attribute_not_exists(id)", put["ConditionExpression"])
+		assert.Equal(t, "txn-1", put["Item"].(map[string]any)["id"].(map[string]any)["S"])
+
+		update := items[1].(map[string]any)["Update"].(map[string]any)
+		assert.Equal(t, "SET amount = amount + :delta", update["UpdateExpression"])
+		assert.Equal(t, "txn-2", update["Key"].(map[string]any)["id"].(map[string]any)["S"])
+
+		writeJSON(t, writer, map[string]any{})
+	})
+
+	err := client.TransactWrite(context.Background(),
+		WriteOp{Kind: WritePut, Table: "transactions", Item: testTransaction{ID: "txn-1"}, Condition: "attribute_not_exists(id)"},
+		WriteOp{Kind: WriteUpdate, Table: "transactions", Key: map[string]any{"id": "txn-2"}, UpdateExpr: "SET amount = amount + :delta", Values: map[string]any{":delta": 5}},
+	)
+	require.NoError(t, err)
+}
+
+func TestDynamoDBTransactWriteRequiresOps(t *testing.T) {
+	client := newTestClient(t, func(t *testing.T, writer http.ResponseWriter, request *http.Request, payload map[string]any) {
+		t.Fatal("no request expected")
+	})
+
+	require.Error(t, client.TransactWrite(context.Background()))
+}
+
 func TestDynamoDBDeleteItem(t *testing.T) {
 	client := newTestClient(t, func(t *testing.T, writer http.ResponseWriter, request *http.Request, payload map[string]any) {
 		assert.Equal(t, "DynamoDB_20120810.DeleteItem", request.Header.Get("X-Amz-Target"))

@@ -157,6 +157,58 @@ func TestHandle_ServiceErrorReturnsBadRequest(t *testing.T) {
 
 var _ wallet.Service = (*MockWalletService)(nil)
 
+func TestHandle_NonZeroBalanceCreatesInitialTransaction(t *testing.T) {
+	body, err := json.Marshal(createWalletRequest{Name: "Main Wallet", Balance: 250.0, WalletType: "debit"})
+	require.NoError(t, err)
+
+	walletService := &MockWalletService{
+		CreateWalletFunc: func(ctx context.Context, ownerID string, name string, currency string, balance float64, walletType string) (wallet.Wallet, error) {
+			return wallet.Wallet{ID: "wallet-1", OwnerID: ownerID, Name: name, Currency: "THB", Balance: balance, Type: wallet.WalletTypeDebit}, nil
+		},
+	}
+
+	calls := 0
+	transactionService := &MockTransactionService{
+		CreateTransactionFunc: func(ctx context.Context, walletID string, walletName string, categoryID string, categoryName string, description string, currency string, imageURL string, txType string, amount float64, date time.Time, ownerID string) error {
+			calls++
+			assert.Equal(t, "wallet-1", walletID)
+			assert.Equal(t, "Main Wallet", walletName)
+			assert.Equal(t, "THB", currency)
+			assert.Equal(t, string(transaction.TransactionTypeIncome), txType)
+			assert.Equal(t, 250.0, amount)
+			assert.Equal(t, "1", ownerID)
+			return nil
+		},
+	}
+
+	handler := &createWalletLambda{walletService: walletService, transactionService: transactionService}
+	response, err := handler.Handle(context.Background(), events.APIGatewayV2HTTPRequest{Body: string(body)})
+
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusCreated, response.StatusCode)
+	assert.Equal(t, 1, calls)
+}
+
+func TestHandle_ZeroBalanceSkipsInitialTransaction(t *testing.T) {
+	body, err := json.Marshal(createWalletRequest{Name: "Main Wallet", WalletType: "debit"})
+	require.NoError(t, err)
+
+	calls := 0
+	transactionService := &MockTransactionService{
+		CreateTransactionFunc: func(ctx context.Context, walletID string, walletName string, categoryID string, categoryName string, description string, currency string, imageURL string, txType string, amount float64, date time.Time, ownerID string) error {
+			calls++
+			return nil
+		},
+	}
+
+	handler := &createWalletLambda{walletService: &MockWalletService{}, transactionService: transactionService}
+	response, err := handler.Handle(context.Background(), events.APIGatewayV2HTTPRequest{Body: string(body)})
+
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusCreated, response.StatusCode)
+	assert.Equal(t, 0, calls)
+}
+
 func TestValidatePayload_EmptyWalletType(t *testing.T) {
 	err := validatePayload(createWalletRequest{WalletType: "   "})
 	require.Error(t, err)

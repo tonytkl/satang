@@ -5,10 +5,12 @@ import (
 	"encoding/json"
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/tonytkl/satang/transaction"
 	"github.com/tonytkl/satang/wallet"
 )
 
@@ -41,6 +43,18 @@ func (m *MockWalletService) SetActiveWallet(ctx context.Context, ownerID string,
 	return nil
 }
 
+type MockTransactionService struct {
+	transaction.Service
+	CreateTransactionFunc func(ctx context.Context, walletID string, walletName string, categoryID string, categoryName string, description string, currency string, imageURL string, txType string, amount float64, date time.Time, ownerID string) error
+}
+
+func (m *MockTransactionService) CreateTransaction(ctx context.Context, walletID string, walletName string, categoryID string, categoryName string, description string, currency string, imageURL string, txType string, amount float64, date time.Time, ownerID string) error {
+	if m.CreateTransactionFunc != nil {
+		return m.CreateTransactionFunc(ctx, walletID, walletName, categoryID, categoryName, description, currency, imageURL, txType, amount, date, ownerID)
+	}
+	return nil
+}
+
 func TestHandle_ValidPayload(t *testing.T) {
 	payload := createWalletRequest{
 		Name:       "Main Wallet",
@@ -70,7 +84,7 @@ func TestHandle_ValidPayload(t *testing.T) {
 		},
 	}
 
-	handler := &createWalletLambda{service: mockService}
+	handler := &createWalletLambda{walletService: mockService, transactionService: &MockTransactionService{}}
 	response, err := handler.Handle(context.Background(), events.APIGatewayV2HTTPRequest{Body: string(body)})
 
 	require.NoError(t, err)
@@ -78,7 +92,7 @@ func TestHandle_ValidPayload(t *testing.T) {
 }
 
 func TestHandle_InvalidJSONPayload(t *testing.T) {
-	handler := &createWalletLambda{service: &MockWalletService{}}
+	handler := &createWalletLambda{walletService: &MockWalletService{}, transactionService: &MockTransactionService{}}
 	response, err := handler.Handle(context.Background(), events.APIGatewayV2HTTPRequest{Body: "invalid json"})
 
 	require.NoError(t, err)
@@ -100,7 +114,7 @@ func TestHandle_MissingWalletType(t *testing.T) {
 	body, err := json.Marshal(payload)
 	require.NoError(t, err)
 
-	handler := &createWalletLambda{service: &MockWalletService{}}
+	handler := &createWalletLambda{walletService: &MockWalletService{}, transactionService: &MockTransactionService{}}
 	response, err := handler.Handle(context.Background(), events.APIGatewayV2HTTPRequest{Body: string(body)})
 
 	require.NoError(t, err)
@@ -129,7 +143,7 @@ func TestHandle_ServiceErrorReturnsBadRequest(t *testing.T) {
 		},
 	}
 
-	handler := &createWalletLambda{service: mockService}
+	handler := &createWalletLambda{walletService: mockService, transactionService: &MockTransactionService{}}
 	response, err := handler.Handle(context.Background(), events.APIGatewayV2HTTPRequest{Body: string(body)})
 
 	require.NoError(t, err)

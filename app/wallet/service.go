@@ -4,9 +4,7 @@ import (
 	"context"
 	"errors"
 	"strings"
-	"time"
 
-	"github.com/tonytkl/satang/transaction"
 	"github.com/tonytkl/satang/utils"
 )
 
@@ -19,14 +17,12 @@ type Service interface {
 }
 
 type service struct {
-	repository         Repository
-	transactionService transaction.Service
+	repository Repository
 }
 
-func NewService(repository Repository, transactionService transaction.Service) Service {
+func NewService(repository Repository) Service {
 	return &service{
-		repository:         repository,
-		transactionService: transactionService,
+		repository: repository,
 	}
 }
 
@@ -58,27 +54,6 @@ func (service *service) CreateWallet(ctx context.Context, ownerID string, name s
 
 	if err := service.repository.CreateWallet(ctx, wallet); err != nil {
 		return wallet, err
-	}
-
-	if balance != 0 {
-		if err := service.transactionService.CreateTransaction(
-			ctx,
-			wallet.ID,
-			wallet.Name,
-			// TODO: Query actual category ID
-			"cat01",
-			"Initial balance",
-			"",
-			wallet.Currency,
-			"",
-			string(transaction.TransactionTypeIncome),
-			wallet.Balance,
-			time.Now().UTC(),
-			wallet.OwnerID,
-		); err != nil {
-			_ = service.repository.DeleteWallet(ctx, ownerID, wallet.ID)
-			return wallet, err
-		}
 	}
 
 	return wallet, nil

@@ -11,7 +11,6 @@ import (
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/tonytkl/satang/clients"
-	"github.com/tonytkl/satang/transaction"
 	"github.com/tonytkl/satang/utils"
 	"github.com/tonytkl/satang/wallet"
 )
@@ -37,9 +36,7 @@ func main() {
 	}
 
 	walletRepository := wallet.NewRepository(db, tableName)
-	transactionRepository := transaction.NewRepository(db, tableName)
-	transactionService := transaction.NewService(transactionRepository)
-	walletService := wallet.NewService(walletRepository, transactionService)
+	walletService := wallet.NewService(walletRepository)
 	handler := &getWalletLambda{service: walletService}
 
 	lambda.Start(handler.Handle)

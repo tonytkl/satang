@@ -5,7 +5,6 @@ Satang is a Go-based backend workspace for personal finance data built on Dynamo
 The repository is split into:
 - `app/`: Go module organized by domain package (e.g. `transaction`, `wallet`, `category`), plus shared clients, repository base, utilities, and Lambda handlers.
 - `infrastructure/`: Terraform configuration to provision DynamoDB resources in AWS.
-- `aws/`: Reserved directory for additional AWS-related assets.
 
 ## Repository Structure
 
@@ -24,7 +23,6 @@ The repository is split into:
 ├── template.sam.yaml
 ├── infrastructure/
 │   └── terraform/
-├── aws/
 └── README.md
 ```
 

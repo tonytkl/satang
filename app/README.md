@@ -1,10 +1,9 @@
 # Satang App
 
 The `app` directory contains the Go module for Satang's application logic and data layer. It provides:
-- Domain models for core entities (users, wallets, categories, transactions).
+- Domain packages (e.g. `transaction`, `wallet`, `category`), each containing its own model, repository, service, and (where applicable) schema.
 - A DynamoDB client wrapper built on AWS SDK v2.
-- Repository layer for data access patterns.
-- Service layer for business logic.
+- A generic base repository shared by domains.
 - AWS Lambda handler implementations.
 
 ## Module
@@ -14,26 +13,28 @@ The `app` directory contains the Go module for Satang's application logic and da
 
 ## Directory Overview
 
+The code is organized by domain rather than by technical layer.
+
 ```text
 app/
+├── <domain>/               # One package per domain (transaction, wallet, category, ...)
+│   ├── <domain>.go         # Domain model and key generation
+│   ├── repository.go       # Data access
+│   ├── service.go          # Business logic
+│   └── schema.go           # Request/response schemas (where applicable)
+├── repository/             # Generic BaseRepository shared by domains
 ├── clients/                # AWS SDK client wrappers (DynamoDB)
-├── model/                  # Domain models and entity definitions
-├── repositories/           # Data access layer and query patterns
-├── services/               # Business logic layer
-├── lambda/                 # AWS Lambda handler implementations
-├── utils/                  # Helper utilities (key generation, date handling, etc.)
+├── lambda/<domain>/<op>/   # Lambda handler entry points (main.go) per operation
+├── models/                 # Shared models
+├── utils/                  # Helpers (API Gateway, dates, keys, constants)
 └── go.mod
 ```
 
 ## Go API Conventions
 
-List endpoints use value slices as the default convention across the app layer.
-
-- Prefer `[]Wallet` and `[]Transaction` for collection return values.
- - Use value returns for wallet single-resource fetches, including `GetWallet(...) (Wallet, error)`.
+- Return value slices (e.g. `[]Wallet`) for collections and values for single-resource fetches.
 - Keep conversion logic at the repository boundary when persistence uses pointer-backed internals.
-
-This keeps the service and API layers consistent with the shared `BaseRepository[List]` behavior and with the schema builders used to produce HTTP responses.
+- Domain repositories build on the shared `BaseRepository[T]`.
 
 ## Local Development
 
@@ -79,35 +80,24 @@ Keys are prefixed with entity type for clarity. For example:
 - Entity sort keys use format: `<ENTITY_TYPE>#<date-or-identifier>`
 - Index keys enable queries by specific attributes (e.g., by category, wallet, or entity ID)
 
-Refer to individual model definitions in `model/` and repository implementations in `repositories/` for specific key schemes.
+Refer to each domain package for its specific key scheme.
 
 ## Core Components
 
+### Domain packages (`<domain>/`)
+- Self-contained: model, repository, service, and schema for one domain.
+- Adding a domain means adding a new package, plus handlers under `lambda/<domain>/`.
+
+### Shared repository (`repository/`)
+- `BaseRepository[T]` provides generic `Save`, `Get`, `List`, `Update`, `Delete`, and `PrepareSave` for any `SatangModel`.
+
 ### Clients (`clients/`)
-- **`dynamodb.go`** — DynamoDB client wrapper
-  - `DynamoDBClient` interface with standard operations: `PutItem`, `GetItem`, `DeleteItem`, `QueryItems`, `ScanItems`
-  - `NewDynamoDBClient` and `NewDynamoDBClientWithConfig` constructors
-  - Supports `.env` configuration and local endpoint override
+- `DynamoDBClient` interface (`PutItem`, `GetItem`, `DeleteItem`, `QueryItems`, `ScanItems`) with `NewDynamoDBClient` and `NewDynamoDBClientWithConfig` constructors.
+- Supports `.env` configuration and local endpoint override.
 
-### Data Layer (`repositories/`, `model/`)
-- **`repositories/`** — Data access implementations
-  - Entity repository patterns for query/write operations
-  - Supports GSI queries, date range filtering, and batch operations
-- **`model/`** — Domain entity definitions
-  - Core entity structs (User, Wallet, Category, etc.)
-  - Entity-specific key generation and validation
-
-### Business Layer (`services/`)
-- **`services/`** — Business logic and orchestration
-  - Service implementations for domain operations
-  - Composition of repositories and utilities
-
-### AWS Integration (`lambda/`)
-- **`lambda/`** — AWS Lambda handler entry points
-  - HTTP endpoint handlers with API Gateway integration
-  - Request/response marshaling and error handling
+### AWS Lambda (`lambda/`)
+- One `main.go` per operation, grouped by domain (`lambda/<domain>/<operation>/`).
+- Handles API Gateway request/response marshaling and error handling.
 
 ### Utilities (`utils/`)
-- **`api_gateway_helper.go`** — API Gateway request/response utilities
-- **`date_helper.go`** — Date and time utilities
-- **`dynamodb_key_helper.go`** — Key generation and formatting helpers
+- `api_gateway_helper.go`, `date_helper.go`, `dynamodb_key_helper.go`, `constants.go`.

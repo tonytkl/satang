@@ -3,7 +3,7 @@
 Satang is a Go-based backend workspace for personal finance data built on DynamoDB.
 
 The repository is split into:
-- `app/`: Go module with data models, DynamoDB client wrapper, repository logic, and tests.
+- `app/`: Go module organized by domain package (e.g. `transaction`, `wallet`, `category`), plus shared clients, repository base, utilities, and Lambda handlers.
 - `infrastructure/`: Terraform configuration to provision DynamoDB resources in AWS.
 - `aws/`: Reserved directory for additional AWS-related assets.
 
@@ -12,11 +12,12 @@ The repository is split into:
 ```text
 .
 ├── app/
+│   ├── <domain>/        # One package per domain (transaction, wallet, category, ...)
 │   ├── clients/
-│   ├── model/
-│   ├── repositories/
-│   ├── services/
+│   ├── repository/
 │   ├── lambda/
+│   ├── models/
+│   ├── utils/
 │   └── go.mod
 ├── scripts/
 ├── docker-compose.local.yml
@@ -140,41 +141,24 @@ API base URL:
 http://127.0.0.1:3000
 ```
 
-### 3. Send HTTP request to create transaction
+### 3. Send HTTP requests
+
+Routes are defined in `template.sam.yaml` under the `/api/v1.0` prefix. Example:
 
 ```bash
-curl -i -X POST "http://127.0.0.1:3000/transactions" \
-	-H "Content-Type: application/json" \
-	-d '{
-		"walletId": "wallet-1",
-		"walletName": "Main Wallet",
-		"categoryId": "category-1",
-		"categoryName": "Food",
-		"description": "Lunch",
-		"currency": "THB",
-		"imageUrl": "",
-		"type": "expense",
-		"amount": 120.5,
-		"date": "2026-06-13"
-	}'
+curl -i "http://127.0.0.1:3000/api/v1.0/<resource>"
 ```
 
-Expected response: `201 Created`
+See `app/README.md` for how handlers map to domains.
 
-### 4. Query data through Lambda endpoint
-
-```bash
-curl -s "http://127.0.0.1:3000/transactions?fromDate=2026-06-01&toDate=2026-06-30" | jq
-```
-
-### 5. Verify records directly in DynamoDB Local (optional)
+### 4. Verify records directly in DynamoDB Local (optional)
 
 ```bash
 AWS_ACCESS_KEY_ID=local AWS_SECRET_ACCESS_KEY=local AWS_DEFAULT_REGION=ap-southeast-1 \
 aws dynamodb scan --table-name satang-dynamodb --endpoint-url http://localhost:8000
 ```
 
-### 6. Stop local services
+### 5. Stop local services
 
 ```bash
 make local-dynamodb-down

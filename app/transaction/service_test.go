@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/tonytkl/satang/clients"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -87,6 +89,61 @@ func TestCreateTransactionSuccess(t *testing.T) {
 		"user-1",
 	)
 	require.NoError(t, err)
+}
+
+func TestPrepareCreateTransactionSuccess(t *testing.T) {
+	service := NewService(&mockTransactionRepository{})
+	testDate := time.Date(2026, time.April, 15, 10, 0, 0, 0, time.UTC)
+
+	op, err := service.PrepareCreateTransaction(
+		"wallet-1",
+		"My Wallet",
+		"category-1",
+		"Groceries",
+		"Weekly grocery shopping",
+		"USD",
+		"https://example.com/image.png",
+		"expense",
+		100.0,
+		testDate,
+		"user-1",
+	)
+
+	require.NoError(t, err)
+	assert.Equal(t, clients.WritePut, op.Kind)
+	assert.Equal(t, "transactions", op.Table)
+	tx, ok := op.Item.(*Transaction)
+	require.True(t, ok, "item type = %T, want *Transaction", op.Item)
+	assert.Equal(t, 100.0, tx.Amount)
+	assert.Equal(t, "USD", tx.Currency)
+	assert.Equal(t, "wallet-1", tx.WalletID)
+	assert.Equal(t, "My Wallet", tx.WalletName)
+	assert.Equal(t, "category-1", tx.CategoryID)
+	assert.Equal(t, "Groceries", tx.CategoryName)
+	assert.Equal(t, TransactionTypeExpense, tx.Type)
+	assert.Equal(t, "user-1", tx.OwnerID)
+}
+
+func TestPrepareCreateTransactionInvalidType(t *testing.T) {
+	service := NewService(&mockTransactionRepository{})
+	testDate := time.Date(2026, time.April, 15, 10, 0, 0, 0, time.UTC)
+
+	op, err := service.PrepareCreateTransaction(
+		"wallet-1",
+		"My Wallet",
+		"category-1",
+		"Groceries",
+		"Weekly grocery shopping",
+		"USD",
+		"https://example.com/image.png",
+		"invalid",
+		100.0,
+		testDate,
+		"user-1",
+	)
+
+	require.Error(t, err)
+	assert.Equal(t, clients.WriteOp{}, op)
 }
 
 func TestCreateTransactionInvalidType(t *testing.T) {
@@ -476,4 +533,8 @@ func TestDeleteTransactionDelegatesToRepository(t *testing.T) {
 	service := NewService(mock)
 	err := service.DeleteTransaction(context.Background(), "user-1", "tx-1")
 	require.NoError(t, err)
+}
+
+func (m *mockTransactionRepository) PrepareCreateTransaction(transaction *Transaction) clients.WriteOp {
+	return clients.WriteOp{Kind: clients.WritePut, Table: "transactions", Item: transaction}
 }

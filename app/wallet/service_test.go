@@ -3,12 +3,11 @@ package wallet
 import (
 	"context"
 	"errors"
+	"github.com/tonytkl/satang/clients"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/tonytkl/satang/transaction"
 )
 
 type mockWalletRepository struct {
@@ -56,43 +55,6 @@ func (m *mockWalletRepository) DeleteWallet(ctx context.Context, ownerID string,
 	return nil
 }
 
-type mockTransactionService struct {
-	createTransactionFn func(ctx context.Context, walletID string, walletName string, categoryID string, categoryName string, description string, currency string, imageURL string, txType string, amount float64, date time.Time, ownerID string) error
-}
-
-var _ transaction.Service = (*mockTransactionService)(nil)
-
-func (m *mockTransactionService) CreateTransaction(ctx context.Context, walletID string, walletName string, categoryID string, categoryName string, description string, currency string, imageURL string, txType string, amount float64, date time.Time, ownerID string) error {
-	if m.createTransactionFn != nil {
-		return m.createTransactionFn(ctx, walletID, walletName, categoryID, categoryName, description, currency, imageURL, txType, amount, date, ownerID)
-	}
-	return nil
-}
-
-func (m *mockTransactionService) GetTransaction(ctx context.Context, transactionID string, ownerID string) (*transaction.Transaction, error) {
-	return nil, nil
-}
-
-func (m *mockTransactionService) ListTransactions(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, nextToken string) ([]transaction.Transaction, string, error) {
-	return nil, "", nil
-}
-
-func (m *mockTransactionService) ListTransactionsOfCategory(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, nextToken string, categoryID string) ([]transaction.Transaction, string, error) {
-	return nil, "", nil
-}
-
-func (m *mockTransactionService) ListTransactionsOfWallet(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, nextToken string, wallet string) ([]transaction.Transaction, string, error) {
-	return nil, "", nil
-}
-
-func (m *mockTransactionService) EditTransaction(ctx context.Context, ownerID string, transactionID string, changedFields map[string]any) error {
-	return nil
-}
-
-func (m *mockTransactionService) DeleteTransaction(ctx context.Context, ownerID string, transactionID string) error {
-	return nil
-}
-
 func TestCreateWalletUsesDefaultCurrencyAndInitialBalance(t *testing.T) {
 	repo := &mockWalletRepository{
 		createWalletFn: func(ctx context.Context, wallet Wallet) error {
@@ -106,22 +68,7 @@ func TestCreateWalletUsesDefaultCurrencyAndInitialBalance(t *testing.T) {
 		},
 	}
 
-	transactionSvc := &mockTransactionService{
-		createTransactionFn: func(ctx context.Context, walletID, walletName, categoryID, categoryName, description, currency, imageURL, txType string, amount float64, date time.Time, ownerID string) error {
-			assert.Equal(t, "Primary Wallet", walletName)
-			assert.Equal(t, "cat01", categoryID)
-			assert.Equal(t, "Initial balance", categoryName)
-			assert.Equal(t, "", description)
-			assert.Equal(t, "THB", currency)
-			assert.Equal(t, "", imageURL)
-			assert.Equal(t, string(transaction.TransactionTypeIncome), txType)
-			assert.Equal(t, 250.0, amount)
-			assert.Equal(t, "user-1", ownerID)
-			return nil
-		},
-	}
-
-	service := NewService(repo, transactionSvc)
+	service := NewService(repo)
 	got, err := service.CreateWallet(context.Background(), "user-1", "Primary Wallet", "", 250.0, "debit")
 	require.NoError(t, err)
 	assert.Equal(t, "Primary Wallet", got.Name)
@@ -131,7 +78,7 @@ func TestCreateWalletUsesDefaultCurrencyAndInitialBalance(t *testing.T) {
 }
 
 func TestCreateWalletInvalidTypeReturnsError(t *testing.T) {
-	service := NewService(&mockWalletRepository{}, &mockTransactionService{})
+	service := NewService(&mockWalletRepository{})
 
 	_, err := service.CreateWallet(context.Background(), "user-1", "Primary Wallet", "USD", 50.0, "invalid")
 	require.Error(t, err)
@@ -147,7 +94,7 @@ func TestCreateWalletRejectsEmptyOwnerID(t *testing.T) {
 		},
 	}
 
-	service := NewService(repo, &mockTransactionService{})
+	service := NewService(repo)
 	_, err := service.CreateWallet(context.Background(), "", "Primary Wallet", "USD", 50.0, "debit")
 
 	require.Error(t, err)
@@ -164,7 +111,7 @@ func TestListWalletsRejectsNegativeLimit(t *testing.T) {
 		},
 	}
 
-	service := NewService(repo, &mockTransactionService{})
+	service := NewService(repo)
 	_, _, err := service.ListWallets(context.Background(), "user-1", "", -1)
 
 	require.Error(t, err)
@@ -182,7 +129,7 @@ func TestGetWalletRejectsEmptyInputsAndPropagatesRepositoryErrors(t *testing.T) 
 			},
 		}
 
-		service := NewService(repo, &mockTransactionService{})
+		service := NewService(repo)
 		_, err := service.GetWallet(context.Background(), "", "wallet-1")
 
 		require.Error(t, err)
@@ -199,7 +146,7 @@ func TestGetWalletRejectsEmptyInputsAndPropagatesRepositoryErrors(t *testing.T) 
 			},
 		}
 
-		service := NewService(repo, &mockTransactionService{})
+		service := NewService(repo)
 		_, err := service.GetWallet(context.Background(), "user-1", "")
 
 		require.Error(t, err)
@@ -216,7 +163,7 @@ func TestGetWalletRejectsEmptyInputsAndPropagatesRepositoryErrors(t *testing.T) 
 			},
 		}
 
-		service := NewService(repo, &mockTransactionService{})
+		service := NewService(repo)
 		got, err := service.GetWallet(context.Background(), "user-1", "wallet-1")
 
 		require.ErrorIs(t, err, ErrWalletNotFound)
@@ -372,7 +319,32 @@ func TestSetActiveWalletDelegatesToEditWallet(t *testing.T) {
 		},
 	}
 
-	svc := NewService(repo, &mockTransactionService{})
+	svc := NewService(repo)
 	err := svc.SetActiveWallet(context.Background(), "user-1", "wallet-1", true)
 	require.NoError(t, err)
+}
+
+func (m *mockWalletRepository) PrepareCreateWallet(wallet *Wallet) clients.WriteOp {
+	return clients.WriteOp{Kind: clients.WritePut, Table: "wallets", Item: wallet}
+}
+
+func TestPrepareCreateWalletReturnsOpWithoutPersisting(t *testing.T) {
+	repo := &mockWalletRepository{
+		createWalletFn: func(ctx context.Context, wallet Wallet) error {
+			t.Fatal("CreateWallet must not be called")
+			return nil
+		},
+	}
+
+	got, op, err := NewService(repo).PrepareCreateWallet("user-1", "Primary", "", 100, "debit")
+	require.NoError(t, err)
+	assert.Equal(t, "THB", got.Currency)
+	assert.Equal(t, 100.0, got.Balance)
+	assert.Equal(t, clients.WritePut, op.Kind)
+	assert.Equal(t, "wallets", op.Table)
+}
+
+func TestPrepareCreateWalletInvalidTypeReturnsError(t *testing.T) {
+	_, _, err := NewService(&mockWalletRepository{}).PrepareCreateWallet("user-1", "Primary", "", 0, "bad")
+	require.Error(t, err)
 }

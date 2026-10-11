@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"github.com/tonytkl/satang/clients"
 	"net/http"
 	"testing"
 
@@ -144,4 +145,8 @@ func assertErrorMessage(t *testing.T, response events.APIGatewayV2HTTPResponse, 
 	var result errorResponse
 	require.NoError(t, json.Unmarshal([]byte(response.Body), &result))
 	assert.Equal(t, expected, result.Message)
+}
+
+func (m *mockWalletService) PrepareCreateWallet(ownerID string, name string, currency string, balance float64, walletType string) (wallet.Wallet, clients.WriteOp, error) {
+	return wallet.Wallet{}, clients.WriteOp{}, nil
 }

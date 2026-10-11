@@ -18,6 +18,7 @@ var ErrTransactionNotFound = errors.New("transaction not found")
 // Repository defines persistence operations for transactions.
 type Repository interface {
 	CreateTransaction(ctx context.Context, transaction *Transaction) error
+	PrepareCreateTransaction(transaction *Transaction) clients.WriteOp
 	GetTransaction(ctx context.Context, ownerID string, transactionID string) (*Transaction, error)
 	EditTransaction(ctx context.Context, ownerID string, transactionID string, changedFields map[string]any) error
 	DeleteTransaction(ctx context.Context, ownerID string, transactionID string) error
@@ -42,6 +43,29 @@ func NewRepository(db clients.DynamoDBClient, tableName string) Repository {
 // Create stores a transaction and populates its derived keys and timestamps.
 // Not using base repository because of GSIs
 func (repository *transactionRepository) CreateTransaction(ctx context.Context, transaction *Transaction) error {
+	repository.populateKeys(transaction)
+
+	err := repository.db.PutItem(ctx, repository.tableName, transaction)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// PrepareCreateTransaction builds an insert op (fails if the item exists) for use in an atomic write.
+func (repository *transactionRepository) PrepareCreateTransaction(transaction *Transaction) clients.WriteOp {
+	repository.populateKeys(transaction)
+
+	return clients.WriteOp{
+		Kind:      clients.WritePut,
+		Table:     repository.tableName,
+		Item:      transaction,
+		Condition: "attribute_not_exists(PK)",
+	}
+}
+
+func (repository *transactionRepository) populateKeys(transaction *Transaction) {
 	sortingKey := utils.GetPartitionKeyWithDate("TX", transaction.Date, transaction.ID)
 
 	transaction.PK = utils.GetPartitionKey("USER", transaction.OwnerID)
@@ -62,13 +86,6 @@ func (repository *transactionRepository) CreateTransaction(ctx context.Context, 
 	if transaction.UpdatedAt.IsZero() {
 		transaction.SetUpdatedAt(transaction.CreatedAt)
 	}
-
-	err := repository.db.PutItem(ctx, repository.tableName, transaction)
-	if err != nil {
-		return err
-	}
-
-	return nil
 }
 
 func (repository *transactionRepository) GetTransaction(ctx context.Context, ownerID string, transactionID string) (*Transaction, error) {

@@ -6,11 +6,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/tonytkl/satang/clients"
 	"github.com/tonytkl/satang/utils"
 )
 
 type Service interface {
 	CreateTransaction(ctx context.Context, walletID string, walletName string, categoryID string, categoryName string, description string, currency string, imageURL string, txType string, amount float64, date time.Time, ownerID string) error
+	// PrepareCreateTransaction validates and builds a write op for the transaction, without persisting.
+	PrepareCreateTransaction(walletID string, walletName string, categoryID string, categoryName string, description string, currency string, imageURL string, txType string, amount float64, date time.Time, ownerID string) (clients.WriteOp, error)
 	GetTransaction(ctx context.Context, transactionID string, ownerID string) (*Transaction, error)
 	ListTransactions(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, nextToken string) ([]Transaction, string, error)
 	ListTransactionsOfCategory(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, nextToken string, categoryID string) ([]Transaction, string, error)
@@ -30,9 +33,25 @@ func NewService(repository Repository) Service {
 }
 
 func (service *transactionService) CreateTransaction(ctx context.Context, walletID string, walletName string, categoryID string, categoryName string, description string, currency string, imageURL string, txType string, amount float64, date time.Time, ownerID string) error {
-	transactionType, err := getTransactionType(txType)
+	transaction, err := buildTransaction(walletID, walletName, categoryID, categoryName, description, currency, imageURL, txType, amount, date, ownerID)
 	if err != nil {
 		return err
+	}
+	return service.repository.CreateTransaction(ctx, transaction)
+}
+
+func (service *transactionService) PrepareCreateTransaction(walletID string, walletName string, categoryID string, categoryName string, description string, currency string, imageURL string, txType string, amount float64, date time.Time, ownerID string) (clients.WriteOp, error) {
+	transaction, err := buildTransaction(walletID, walletName, categoryID, categoryName, description, currency, imageURL, txType, amount, date, ownerID)
+	if err != nil {
+		return clients.WriteOp{}, err
+	}
+	return service.repository.PrepareCreateTransaction(transaction), nil
+}
+
+func buildTransaction(walletID string, walletName string, categoryID string, categoryName string, description string, currency string, imageURL string, txType string, amount float64, date time.Time, ownerID string) (*Transaction, error) {
+	transactionType, err := getTransactionType(txType)
+	if err != nil {
+		return nil, err
 	}
 	transaction := NewTransaction(
 		walletID,
@@ -48,12 +67,9 @@ func (service *transactionService) CreateTransaction(ctx context.Context, wallet
 		ownerID,
 	)
 	if err := validateTransaction(transaction); err != nil {
-		return err
+		return nil, err
 	}
-	if err := service.repository.CreateTransaction(ctx, transaction); err != nil {
-		return err
-	}
-	return nil
+	return transaction, nil
 }
 
 func (service *transactionService) GetTransaction(ctx context.Context, transactionID string, ownerID string) (*Transaction, error) {

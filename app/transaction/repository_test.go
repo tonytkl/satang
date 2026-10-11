@@ -131,6 +131,34 @@ func TestTransactionRepositoryCreateSuccess(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestTransactionRepositoryPrepareCreateTransaction(t *testing.T) {
+	repo := NewRepository(&mockDynamoDB{}, "transactions")
+	tx := &Transaction{
+		ID:         "tx-1",
+		OwnerID:    "user-1",
+		WalletID:   "wallet-1",
+		CategoryID: "cat-1",
+		Date:       time.Date(2026, 4, 15, 10, 0, 0, 0, time.UTC),
+	}
+
+	op := repo.PrepareCreateTransaction(tx)
+
+	assert.Equal(t, clients.WritePut, op.Kind)
+	assert.Equal(t, "transactions", op.Table)
+	assert.Same(t, tx, op.Item)
+	assert.Equal(t, "attribute_not_exists(PK)", op.Condition)
+	assert.Equal(t, "USER#user-1", tx.PK)
+	assert.Equal(t, "TX#tx-1", tx.SK)
+	assert.Equal(t, "USER#user-1", tx.GSI_ByDatePK)
+	assert.Equal(t, "TX#2026-04-15#tx-1", tx.GSI_ByDateSK)
+	assert.Equal(t, "USER#user-1#TX_CATEGORY#cat-1", tx.GSI_ByCategoryPK)
+	assert.Equal(t, "TX#2026-04-15#tx-1", tx.GSI_ByCategorySK)
+	assert.Equal(t, "USER#user-1#TX_WALLET#wallet-1", tx.GSI_ByWalletPK)
+	assert.Equal(t, "TX#2026-04-15#tx-1", tx.GSI_ByWalletSK)
+	require.False(t, tx.CreatedAt.IsZero())
+	assert.Equal(t, tx.CreatedAt, tx.UpdatedAt)
+}
+
 func TestTransactionRepositoryGetTransactionSuccess(t *testing.T) {
 	mock := &mockDynamoDB{
 		getItemFn: func(_ context.Context, table string, key map[string]any, out any) error {

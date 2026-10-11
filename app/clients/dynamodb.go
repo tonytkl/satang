@@ -386,6 +386,9 @@ func (op WriteOp) toTransactWriteItem() (types.TransactWriteItem, error) {
 			ExpressionAttributeValues: values,
 		}
 	case WriteCheck:
+		if op.Condition == "" {
+			return item, errors.New("write check requires a condition")
+		}
 		item.ConditionCheck = &types.ConditionCheck{
 			TableName:                 aws.String(op.Table),
 			Key:                       attrKey,

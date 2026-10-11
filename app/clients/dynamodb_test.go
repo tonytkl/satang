@@ -89,6 +89,20 @@ func TestDynamoDBTransactWriteRequiresOps(t *testing.T) {
 	require.Error(t, client.TransactWrite(context.Background()))
 }
 
+func TestDynamoDBTransactWriteCheckRequiresCondition(t *testing.T) {
+	client := newTestClient(t, func(t *testing.T, writer http.ResponseWriter, request *http.Request, payload map[string]any) {
+		t.Fatal("no request expected")
+	})
+
+	err := client.TransactWrite(context.Background(), WriteOp{
+		Kind:  WriteCheck,
+		Table: "transactions",
+		Key:   map[string]any{"id": "txn-1"},
+	})
+
+	require.EqualError(t, err, "write check requires a condition")
+}
+
 func TestDynamoDBDeleteItem(t *testing.T) {
 	client := newTestClient(t, func(t *testing.T, writer http.ResponseWriter, request *http.Request, payload map[string]any) {
 		assert.Equal(t, "DynamoDB_20120810.DeleteItem", request.Header.Get("X-Amz-Target"))

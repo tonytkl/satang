@@ -34,6 +34,7 @@ resource "aws_iam_role_policy" "lambda_dynamodb_access" {
           "dynamodb:GetItem",
           "dynamodb:UpdateItem",
           "dynamodb:DeleteItem",
+          "dynamodb:ConditionCheckItem",
           "dynamodb:Query",
         ]
         Resource = [

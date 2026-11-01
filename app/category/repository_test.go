@@ -136,20 +136,26 @@ func TestCategoryRepositoryGetCategory(t *testing.T) {
 
 func TestCategoryRepositoryEditCategory(t *testing.T) {
 	db := &mockCategoryDynamoDB{
-		updateItemFn: func(_ context.Context, table string, key map[string]any, updateExpression string, expressionValues map[string]any, _ map[string]string, conditionExpression string, _ any) error {
+		updateItemFn: func(_ context.Context, table string, key map[string]any, updateExpression string, expressionValues map[string]any, _ map[string]string, conditionExpression string, out any) error {
 			require.Equal(t, "categories", table)
 			assert.Equal(t, "USER#owner-1", key["PK"])
 			assert.Equal(t, "CATEGORY#category-1", key["SK"])
 			assert.Contains(t, updateExpression, "SET")
 			assert.Equal(t, "category-1", expressionValues[":id"])
 			assert.Equal(t, "attribute_exists(PK) AND attribute_exists(SK) AND ID = :id", conditionExpression)
+			updatedCategory, ok := out.(*Category)
+			require.True(t, ok)
+			updatedCategory.ID = "category-1"
+			updatedCategory.Name = "Travel"
 			return nil
 		},
 	}
 
 	repo := NewRepository(db, "categories")
-	err := repo.EditCategory(context.Background(), "owner-1", "category-1", map[string]any{"Name": "Travel"})
+	got, err := repo.EditCategory(context.Background(), "owner-1", "category-1", map[string]any{"Name": "Travel"})
 	require.NoError(t, err)
+	assert.Equal(t, "category-1", got.ID)
+	assert.Equal(t, "Travel", got.Name)
 }
 
 func TestCategoryRepositoryDeleteCategory(t *testing.T) {

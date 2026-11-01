@@ -13,7 +13,7 @@ type mockCategoryRepository struct {
 	createCategoryFn func(ctx context.Context, category Category) error
 	listCategoriesFn func(ctx context.Context, ownerID string, nextToken string, limit int32) ([]Category, string, error)
 	getCategoryFn    func(ctx context.Context, ownerID string, categoryID string) (Category, error)
-	editCategoryFn   func(ctx context.Context, ownerID string, categoryID string, changedFields map[string]any) error
+	editCategoryFn   func(ctx context.Context, ownerID string, categoryID string, changedFields map[string]any) (Category, error)
 	deleteCategoryFn func(ctx context.Context, ownerID string, categoryID string) error
 }
 
@@ -40,11 +40,11 @@ func (m *mockCategoryRepository) GetCategory(ctx context.Context, ownerID string
 	return Category{}, nil
 }
 
-func (m *mockCategoryRepository) EditCategory(ctx context.Context, ownerID string, categoryID string, changedFields map[string]any) error {
+func (m *mockCategoryRepository) EditCategory(ctx context.Context, ownerID string, categoryID string, changedFields map[string]any) (Category, error) {
 	if m.editCategoryFn != nil {
 		return m.editCategoryFn(ctx, ownerID, categoryID, changedFields)
 	}
-	return nil
+	return Category{}, nil
 }
 
 func (m *mockCategoryRepository) DeleteCategory(ctx context.Context, ownerID string, categoryID string) error {
@@ -117,14 +117,14 @@ func TestCreateCategoryRejectsEmptyOwnerID(t *testing.T) {
 func TestEditCategoryRejectsProtectedFields(t *testing.T) {
 	repoCalled := false
 	repo := &mockCategoryRepository{
-		editCategoryFn: func(ctx context.Context, ownerID string, categoryID string, changedFields map[string]any) error {
+		editCategoryFn: func(ctx context.Context, ownerID string, categoryID string, changedFields map[string]any) (Category, error) {
 			repoCalled = true
-			return nil
+			return Category{}, nil
 		},
 	}
 
 	svc := &service{repository: repo}
-	err := svc.EditCategory(context.Background(), "user-1", "category-1", map[string]any{"OwnerID": "user-2"})
+	_, err := svc.EditCategory(context.Background(), "user-1", "category-1", map[string]any{"OwnerID": "user-2"})
 
 	require.Error(t, err)
 	assert.Equal(t, "Owner ID is not updateable", err.Error())
@@ -166,17 +166,18 @@ func TestListCategoriesRejectsNegativeLimit(t *testing.T) {
 
 func TestEditCategoryDelegatesToRepository(t *testing.T) {
 	repo := &mockCategoryRepository{
-		editCategoryFn: func(ctx context.Context, ownerID string, categoryID string, changedFields map[string]any) error {
+		editCategoryFn: func(ctx context.Context, ownerID string, categoryID string, changedFields map[string]any) (Category, error) {
 			assert.Equal(t, "user-1", ownerID)
 			assert.Equal(t, "category-1", categoryID)
 			assert.Equal(t, map[string]any{"Name": "Rental"}, changedFields)
-			return nil
+			return Category{Name: "Rental"}, nil
 		},
 	}
 
 	svc := &service{repository: repo}
-	err := svc.EditCategory(context.Background(), "user-1", "category-1", map[string]any{"Name": "Rental"})
+	got, err := svc.EditCategory(context.Background(), "user-1", "category-1", map[string]any{"Name": "Rental"})
 	require.NoError(t, err)
+	assert.Equal(t, "Rental", got.Name)
 }
 
 func TestEditCategoryConvertsTypeBeforeRepository(t *testing.T) {
@@ -185,33 +186,34 @@ func TestEditCategoryConvertsTypeBeforeRepository(t *testing.T) {
 	}
 
 	repo := &mockCategoryRepository{
-		editCategoryFn: func(ctx context.Context, ownerID string, categoryID string, fields map[string]any) error {
+		editCategoryFn: func(ctx context.Context, ownerID string, categoryID string, fields map[string]any) (Category, error) {
 			assert.Equal(t, "user-1", ownerID)
 			assert.Equal(t, "category-1", categoryID)
 
 			typeValue, ok := fields["Type"]
 			require.True(t, ok)
 			assert.Equal(t, CategoryTypeIncome, typeValue)
-			return nil
+			return Category{Type: CategoryTypeIncome}, nil
 		},
 	}
 
 	svc := &service{repository: repo}
-	err := svc.EditCategory(context.Background(), "user-1", "category-1", changedFields)
+	got, err := svc.EditCategory(context.Background(), "user-1", "category-1", changedFields)
 	require.NoError(t, err)
+	assert.Equal(t, CategoryTypeIncome, got.Type)
 }
 
 func TestEditCategoryRejectsNonStringType(t *testing.T) {
 	repositoryCalled := false
 	repo := &mockCategoryRepository{
-		editCategoryFn: func(ctx context.Context, ownerID string, categoryID string, changedFields map[string]any) error {
+		editCategoryFn: func(ctx context.Context, ownerID string, categoryID string, changedFields map[string]any) (Category, error) {
 			repositoryCalled = true
-			return nil
+			return Category{}, nil
 		},
 	}
 
 	svc := &service{repository: repo}
-	err := svc.EditCategory(context.Background(), "user-1", "category-1", map[string]any{"Type": 123})
+	_, err := svc.EditCategory(context.Background(), "user-1", "category-1", map[string]any{"Type": 123})
 
 	require.Error(t, err)
 	assert.Equal(t, "Type must be a string", err.Error())
@@ -221,32 +223,33 @@ func TestEditCategoryRejectsNonStringType(t *testing.T) {
 func TestSetActiveCategoryDelegatesToEditCategory(t *testing.T) {
 	repoCalled := false
 	repo := &mockCategoryRepository{
-		editCategoryFn: func(ctx context.Context, ownerID string, categoryID string, changedFields map[string]any) error {
+		editCategoryFn: func(ctx context.Context, ownerID string, categoryID string, changedFields map[string]any) (Category, error) {
 			repoCalled = true
 			assert.Equal(t, "user-1", ownerID)
 			assert.Equal(t, "category-1", categoryID)
 			assert.Equal(t, map[string]any{"IsActive": true}, changedFields)
-			return nil
+			return Category{IsActive: true}, nil
 		},
 	}
 
 	svc := NewService(repo)
-	err := svc.SetActiveCategory(context.Background(), "user-1", "category-1", true)
+	got, err := svc.SetActiveCategory(context.Background(), "user-1", "category-1", true)
 
 	require.NoError(t, err)
 	assert.True(t, repoCalled)
+	assert.True(t, got.IsActive)
 }
 
 func TestEditCategoryReturnsRepositoryError(t *testing.T) {
 	repoErr := errors.New("repository failure")
 	repo := &mockCategoryRepository{
-		editCategoryFn: func(ctx context.Context, ownerID string, categoryID string, changedFields map[string]any) error {
-			return repoErr
+		editCategoryFn: func(ctx context.Context, ownerID string, categoryID string, changedFields map[string]any) (Category, error) {
+			return Category{}, repoErr
 		},
 	}
 
 	svc := &service{repository: repo}
-	err := svc.EditCategory(context.Background(), "user-1", "category-1", map[string]any{"Name": "Updated"})
+	_, err := svc.EditCategory(context.Background(), "user-1", "category-1", map[string]any{"Name": "Updated"})
 
 	require.Error(t, err)
 	assert.Equal(t, repoErr, err)

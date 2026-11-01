@@ -14,7 +14,7 @@ type Repository interface {
 	CreateCategory(ctx context.Context, category Category) error
 	ListCategories(ctx context.Context, ownerID string, nextToken string, limit int32) ([]Category, string, error)
 	GetCategory(ctx context.Context, ownerID string, categoryID string) (Category, error)
-	EditCategory(ctx context.Context, ownerID string, categoryID string, changedFields map[string]any) error
+	EditCategory(ctx context.Context, ownerID string, categoryID string, changedFields map[string]any) (Category, error)
 	DeleteCategory(ctx context.Context, ownerID string, categoryID string) error
 }
 
@@ -67,9 +67,9 @@ func (categoryRepository *categoryRepository) GetCategory(ctx context.Context, o
 	return *category, nil
 }
 
-func (categoryRepository *categoryRepository) EditCategory(ctx context.Context, ownerID string, categoryID string, changedFields map[string]any) error {
-	_, err := categoryRepository.baseRepository.Update(ctx, ownerID, categoryID, changedFields)
-	return err
+func (categoryRepository *categoryRepository) EditCategory(ctx context.Context, ownerID string, categoryID string, changedFields map[string]any) (Category, error) {
+	category, err := categoryRepository.baseRepository.Update(ctx, ownerID, categoryID, changedFields)
+	return *category, err
 }
 
 func (categoryRepository *categoryRepository) DeleteCategory(ctx context.Context, ownerID string, categoryID string) error {

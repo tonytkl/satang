@@ -9,9 +9,9 @@ import (
 )
 
 type Service interface {
-	CreateCategory(ctx context.Context, ownerID string, name string, strCategoryType string) error
-	ListCategories(ctx context.Context, ownerID string, nextToken string, limit int32) ([]*Category, string, error)
-	GetCategory(ctx context.Context, ownerID string, categoryID string) (*Category, error)
+	CreateCategory(ctx context.Context, ownerID string, name string, strCategoryType string) (Category, error)
+	ListCategories(ctx context.Context, ownerID string, nextToken string, limit int32) ([]Category, string, error)
+	GetCategory(ctx context.Context, ownerID string, categoryID string) (Category, error)
 	EditCategory(ctx context.Context, ownerID string, categoryID string, changedFields map[string]any) error
 	SetActiveCategory(ctx context.Context, ownerID string, categoryID string, isActive bool) error
 }
@@ -26,15 +26,15 @@ func NewService(repository Repository) Service {
 	}
 }
 
-func (service *service) CreateCategory(ctx context.Context, ownerID string, name string, strCategoryType string) error {
+func (service *service) CreateCategory(ctx context.Context, ownerID string, name string, strCategoryType string) (Category, error) {
 	if ownerID == "" {
-		return errors.New("owner ID is required")
+		return Category{}, errors.New("owner ID is required")
 	}
 
 	categoryID := utils.GetUUID()
 	categoryType, err := getCategoryType(strCategoryType)
 	if err != nil {
-		return err
+		return Category{}, err
 	}
 	category := NewCategory(
 		categoryID,
@@ -44,13 +44,13 @@ func (service *service) CreateCategory(ctx context.Context, ownerID string, name
 	)
 
 	if err := service.repository.CreateCategory(ctx, category); err != nil {
-		return err
+		return Category{}, err
 	}
 
-	return nil
+	return category, nil
 }
 
-func (service *service) ListCategories(ctx context.Context, ownerID string, nextToken string, limit int32) ([]*Category, string, error) {
+func (service *service) ListCategories(ctx context.Context, ownerID string, nextToken string, limit int32) ([]Category, string, error) {
 	if limit < 0 {
 		return nil, "", errors.New("limit must be greater than or equal to 0")
 	}
@@ -65,7 +65,7 @@ func (service *service) ListCategories(ctx context.Context, ownerID string, next
 	)
 }
 
-func (service *service) GetCategory(ctx context.Context, ownerID string, categoryID string) (*Category, error) {
+func (service *service) GetCategory(ctx context.Context, ownerID string, categoryID string) (Category, error) {
 	return service.repository.GetCategory(
 		ctx,
 		ownerID,

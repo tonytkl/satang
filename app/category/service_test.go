@@ -10,34 +10,34 @@ import (
 )
 
 type mockCategoryRepository struct {
-	createCategoryFn  func(ctx context.Context, category *Category) error
-	listCategoriesFn  func(ctx context.Context, ownerID string, nextToken string, limit int32) ([]*Category, string, error)
-	getCategoryFn     func(ctx context.Context, ownerID string, categoryID string) (*Category, error)
-	editCategoryFn    func(ctx context.Context, ownerID string, categoryID string, changedFields map[string]any) error
-	deleteCategoryFn  func(ctx context.Context, ownerID string, categoryID string) error
+	createCategoryFn func(ctx context.Context, category Category) error
+	listCategoriesFn func(ctx context.Context, ownerID string, nextToken string, limit int32) ([]Category, string, error)
+	getCategoryFn    func(ctx context.Context, ownerID string, categoryID string) (Category, error)
+	editCategoryFn   func(ctx context.Context, ownerID string, categoryID string, changedFields map[string]any) error
+	deleteCategoryFn func(ctx context.Context, ownerID string, categoryID string) error
 }
 
 var _ Repository = (*mockCategoryRepository)(nil)
 
-func (m *mockCategoryRepository) CreateCategory(ctx context.Context, category *Category) error {
+func (m *mockCategoryRepository) CreateCategory(ctx context.Context, category Category) error {
 	if m.createCategoryFn != nil {
 		return m.createCategoryFn(ctx, category)
 	}
 	return nil
 }
 
-func (m *mockCategoryRepository) ListCategories(ctx context.Context, ownerID string, nextToken string, limit int32) ([]*Category, string, error) {
+func (m *mockCategoryRepository) ListCategories(ctx context.Context, ownerID string, nextToken string, limit int32) ([]Category, string, error) {
 	if m.listCategoriesFn != nil {
 		return m.listCategoriesFn(ctx, ownerID, nextToken, limit)
 	}
 	return nil, "", nil
 }
 
-func (m *mockCategoryRepository) GetCategory(ctx context.Context, ownerID string, categoryID string) (*Category, error) {
+func (m *mockCategoryRepository) GetCategory(ctx context.Context, ownerID string, categoryID string) (Category, error) {
 	if m.getCategoryFn != nil {
 		return m.getCategoryFn(ctx, ownerID, categoryID)
 	}
-	return nil, nil
+	return Category{}, nil
 }
 
 func (m *mockCategoryRepository) EditCategory(ctx context.Context, ownerID string, categoryID string, changedFields map[string]any) error {
@@ -57,7 +57,7 @@ func (m *mockCategoryRepository) DeleteCategory(ctx context.Context, ownerID str
 func TestCreateCategoryCreatesCategoryWithValidType(t *testing.T) {
 	repoCalled := false
 	repo := &mockCategoryRepository{
-		createCategoryFn: func(ctx context.Context, category *Category) error {
+		createCategoryFn: func(ctx context.Context, category Category) error {
 			repoCalled = true
 			require.NotEmpty(t, category.ID)
 			assert.Equal(t, "user-1", category.OwnerID)
@@ -71,23 +71,26 @@ func TestCreateCategoryCreatesCategoryWithValidType(t *testing.T) {
 	}
 
 	svc := NewService(repo)
-	err := svc.CreateCategory(context.Background(), "user-1", "Groceries", "expense")
+	created, err := svc.CreateCategory(context.Background(), "user-1", "Groceries", "expense")
 
 	require.NoError(t, err)
 	assert.True(t, repoCalled)
+	assert.Equal(t, "user-1", created.OwnerID)
+	assert.Equal(t, "Groceries", created.Name)
+	assert.Equal(t, CategoryTypeExpense, created.Type)
 }
 
 func TestCreateCategoryRejectsInvalidType(t *testing.T) {
 	repoCalled := false
 	repo := &mockCategoryRepository{
-		createCategoryFn: func(ctx context.Context, category *Category) error {
+		createCategoryFn: func(ctx context.Context, category Category) error {
 			repoCalled = true
 			return nil
 		},
 	}
 
 	svc := NewService(repo)
-	err := svc.CreateCategory(context.Background(), "user-1", "Groceries", "invalid")
+	_, err := svc.CreateCategory(context.Background(), "user-1", "Groceries", "invalid")
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "Invalid category type")
@@ -97,14 +100,14 @@ func TestCreateCategoryRejectsInvalidType(t *testing.T) {
 func TestCreateCategoryRejectsEmptyOwnerID(t *testing.T) {
 	repoCalled := false
 	repo := &mockCategoryRepository{
-		createCategoryFn: func(ctx context.Context, category *Category) error {
+		createCategoryFn: func(ctx context.Context, category Category) error {
 			repoCalled = true
 			return nil
 		},
 	}
 
 	svc := NewService(repo)
-	err := svc.CreateCategory(context.Background(), "", "Groceries", "expense")
+	_, err := svc.CreateCategory(context.Background(), "", "Groceries", "expense")
 
 	require.Error(t, err)
 	assert.Equal(t, "owner ID is required", err.Error())
@@ -131,9 +134,9 @@ func TestEditCategoryRejectsProtectedFields(t *testing.T) {
 func TestListCategoriesUsesDefaultLimitWhenZero(t *testing.T) {
 	var gotLimit int32
 	repo := &mockCategoryRepository{
-		listCategoriesFn: func(ctx context.Context, ownerID string, nextToken string, limit int32) ([]*Category, string, error) {
+		listCategoriesFn: func(ctx context.Context, ownerID string, nextToken string, limit int32) ([]Category, string, error) {
 			gotLimit = limit
-			return []*Category{}, "", nil
+			return []Category{}, "", nil
 		},
 	}
 
@@ -147,9 +150,9 @@ func TestListCategoriesUsesDefaultLimitWhenZero(t *testing.T) {
 func TestListCategoriesRejectsNegativeLimit(t *testing.T) {
 	repoCalled := false
 	repo := &mockCategoryRepository{
-		listCategoriesFn: func(ctx context.Context, ownerID string, nextToken string, limit int32) ([]*Category, string, error) {
+		listCategoriesFn: func(ctx context.Context, ownerID string, nextToken string, limit int32) ([]Category, string, error) {
 			repoCalled = true
-			return []*Category{}, "", nil
+			return []Category{}, "", nil
 		},
 	}
 

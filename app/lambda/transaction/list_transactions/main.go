@@ -26,7 +26,7 @@ type listTransactionsLambda struct {
 
 type listTransactionsResponse struct {
 	Transactions []transaction.TransactionRead `json:"transactions"`
-	NextToken    string                           `json:"nextToken"`
+	NextToken    string                        `json:"nextToken"`
 }
 
 func main() {

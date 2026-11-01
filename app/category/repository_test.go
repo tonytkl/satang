@@ -83,7 +83,7 @@ func TestCategoryRepositoryCreateCategory(t *testing.T) {
 	}
 
 	repo := NewRepository(db, "categories")
-	err := repo.CreateCategory(context.Background(), &Category{ID: "category-1", OwnerID: "owner-1", Name: "Food"})
+	err := repo.CreateCategory(context.Background(), Category{ID: "category-1", OwnerID: "owner-1", Name: "Food"})
 	require.NoError(t, err)
 }
 
@@ -131,7 +131,6 @@ func TestCategoryRepositoryGetCategory(t *testing.T) {
 	repo := NewRepository(db, "categories")
 	got, err := repo.GetCategory(context.Background(), "owner-1", "category-1")
 	require.NoError(t, err)
-	require.NotNil(t, got)
 	assert.Equal(t, "category-1", got.ID)
 }
 

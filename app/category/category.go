@@ -27,9 +27,9 @@ type Category struct {
 	UpdatedAt time.Time    `dynamodbav:"UpdatedAt"`
 }
 
-func NewCategory(id string, ownerID string, name string, categoryType CategoryType) *Category {
+func NewCategory(id string, ownerID string, name string, categoryType CategoryType) Category {
 	now := time.Now().UTC()
-	return &Category{
+	return Category{
 		PK:        "USER#" + ownerID,
 		SK:        "CATEGORY#" + id,
 		ID:        id,

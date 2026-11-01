@@ -2,15 +2,18 @@ package category
 
 import (
 	"context"
+	"errors"
 
 	"github.com/tonytkl/satang/clients"
 	"github.com/tonytkl/satang/repository"
 )
 
+var ErrCategoryNotFound = errors.New("Category not found")
+
 type Repository interface {
-	CreateCategory(ctx context.Context, category *Category) error
-	ListCategories(ctx context.Context, ownerID string, nextToken string, limit int32) ([]*Category, string, error)
-	GetCategory(ctx context.Context, ownerID string, categoryID string) (*Category, error)
+	CreateCategory(ctx context.Context, category Category) error
+	ListCategories(ctx context.Context, ownerID string, nextToken string, limit int32) ([]Category, string, error)
+	GetCategory(ctx context.Context, ownerID string, categoryID string) (Category, error)
 	EditCategory(ctx context.Context, ownerID string, categoryID string, changedFields map[string]any) error
 	DeleteCategory(ctx context.Context, ownerID string, categoryID string) error
 }
@@ -29,16 +32,39 @@ func NewRepository(db clients.DynamoDBClient, tableName string) Repository {
 	}
 }
 
-func (categoryRepository *categoryRepository) CreateCategory(ctx context.Context, category *Category) error {
-	return categoryRepository.baseRepository.Save(ctx, category)
+func (categoryRepository *categoryRepository) CreateCategory(ctx context.Context, category Category) error {
+	return categoryRepository.baseRepository.Save(ctx, &category)
 }
 
-func (categoryRepository *categoryRepository) ListCategories(ctx context.Context, ownerID string, nextToken string, limit int32) ([]*Category, string, error) {
-	return categoryRepository.baseRepository.List(ctx, ownerID, nextToken, limit)
+func (categoryRepository *categoryRepository) ListCategories(ctx context.Context, ownerID string, nextToken string, limit int32) ([]Category, string, error) {
+	items, encodedNextToken, err := categoryRepository.baseRepository.List(ctx, ownerID, nextToken, limit)
+	if err != nil {
+		return nil, "", err
+	}
+
+	wallets := make([]Category, 0, len(items))
+	for _, item := range items {
+		if item == nil {
+			continue
+		}
+		wallets = append(wallets, *item)
+	}
+
+	return wallets, encodedNextToken, nil
 }
 
-func (categoryRepository *categoryRepository) GetCategory(ctx context.Context, ownerID string, categoryID string) (*Category, error) {
-	return categoryRepository.baseRepository.Get(ctx, ownerID, categoryID)
+func (categoryRepository *categoryRepository) GetCategory(ctx context.Context, ownerID string, categoryID string) (Category, error) {
+	category, err := categoryRepository.baseRepository.Get(ctx, ownerID, categoryID)
+	if err != nil {
+		if errors.Is(err, clients.ErrItemNotFound) {
+			return Category{}, ErrCategoryNotFound
+		}
+		return Category{}, err
+	}
+	if category == nil {
+		return Category{}, ErrCategoryNotFound
+	}
+	return *category, nil
 }
 
 func (categoryRepository *categoryRepository) EditCategory(ctx context.Context, ownerID string, categoryID string, changedFields map[string]any) error {

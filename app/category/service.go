@@ -12,8 +12,8 @@ type Service interface {
 	CreateCategory(ctx context.Context, ownerID string, name string, strCategoryType string) (Category, error)
 	ListCategories(ctx context.Context, ownerID string, nextToken string, limit int32) ([]Category, string, error)
 	GetCategory(ctx context.Context, ownerID string, categoryID string) (Category, error)
-	EditCategory(ctx context.Context, ownerID string, categoryID string, changedFields map[string]any) error
-	SetActiveCategory(ctx context.Context, ownerID string, categoryID string, isActive bool) error
+	EditCategory(ctx context.Context, ownerID string, categoryID string, changedFields map[string]any) (Category, error)
+	SetActiveCategory(ctx context.Context, ownerID string, categoryID string, isActive bool) (Category, error)
 }
 
 type service struct {
@@ -73,20 +73,20 @@ func (service *service) GetCategory(ctx context.Context, ownerID string, categor
 	)
 }
 
-func (service *service) EditCategory(ctx context.Context, ownerID string, categoryID string, changedFields map[string]any) error {
+func (service *service) EditCategory(ctx context.Context, ownerID string, categoryID string, changedFields map[string]any) (Category, error) {
 	if _, ok := changedFields["OwnerID"]; ok {
-		return errors.New("Owner ID is not updateable")
+		return Category{}, errors.New("Owner ID is not updateable")
 	}
 
 	if typeValue, ok := changedFields["Type"]; ok {
 		strCategoryType, ok := typeValue.(string)
 		if !ok {
-			return errors.New("Type must be a string")
+			return Category{}, errors.New("Type must be a string")
 		}
 
 		categoryType, err := getCategoryType(strCategoryType)
 		if err != nil {
-			return err
+			return Category{}, err
 		}
 		changedFields["Type"] = categoryType
 	}
@@ -94,7 +94,7 @@ func (service *service) EditCategory(ctx context.Context, ownerID string, catego
 	return service.repository.EditCategory(ctx, ownerID, categoryID, changedFields)
 }
 
-func (service *service) SetActiveCategory(ctx context.Context, ownerID string, categoryID string, isActive bool) error {
+func (service *service) SetActiveCategory(ctx context.Context, ownerID string, categoryID string, isActive bool) (Category, error) {
 	changedFields := make(map[string]any, 1)
 	changedFields["IsActive"] = isActive
 	return service.EditCategory(ctx, ownerID, categoryID, changedFields)

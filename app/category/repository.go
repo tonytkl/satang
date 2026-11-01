@@ -42,15 +42,15 @@ func (categoryRepository *categoryRepository) ListCategories(ctx context.Context
 		return nil, "", err
 	}
 
-	wallets := make([]Category, 0, len(items))
+	categories := make([]Category, 0, len(items))
 	for _, item := range items {
 		if item == nil {
 			continue
 		}
-		wallets = append(wallets, *item)
+		categories = append(categories, *item)
 	}
 
-	return wallets, encodedNextToken, nil
+	return categories, encodedNextToken, nil
 }
 
 func (categoryRepository *categoryRepository) GetCategory(ctx context.Context, ownerID string, categoryID string) (Category, error) {

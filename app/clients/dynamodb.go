@@ -19,6 +19,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/joho/godotenv"
+	"github.com/tonytkl/satang/utils"
 )
 
 // DynamoDBClient defines the public methods supported by the DynamoDB wrapper.
@@ -253,7 +254,7 @@ func (d *DynamoDB) QueryItemsWithPagination(ctx context.Context, table string, k
 	if paginationToken != "" {
 		exclusiveStartKey, err := decodePaginationToken(paginationToken)
 		if err != nil {
-			return "", fmt.Errorf("decode pagination token: %w", err)
+			return "", utils.ValidationError(fmt.Errorf("decode pagination token: %w", err))
 		}
 		input.ExclusiveStartKey = exclusiveStartKey
 	}

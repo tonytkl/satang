@@ -159,7 +159,7 @@ func (repository *baseRepository[T]) Update(ctx context.Context, ownerID string,
 	}
 
 	if len(changedFields) == 0 {
-		return zero, errors.New("Update payload is required")
+		return zero, utils.ValidationError(errors.New("Update payload is required"))
 	}
 
 	key := map[string]any{

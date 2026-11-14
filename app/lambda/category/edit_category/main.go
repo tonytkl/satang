@@ -18,7 +18,7 @@ import (
 
 type editCategoryRequest struct {
 	Name         *string `json:"name"`
-	CategoryType *string `json:"categoryType"`
+	CategoryType *string `json:"type"`
 }
 
 type errorResponse struct {
@@ -80,7 +80,7 @@ func (handler *editCategoryLambda) Handle(ctx context.Context, request events.AP
 		if errors.Is(err, category.ErrCategoryNotFound) {
 			return utils.JsonResponse(http.StatusNotFound, errorResponse{Message: "Category not found"})
 		}
-		return utils.JsonResponse(http.StatusBadRequest, errorResponse{Message: err.Error()})
+		return utils.JsonResponse(utils.ErrorStatusCode(err), errorResponse{Message: err.Error()})
 	}
 
 	categoryResponse := category.BuildCategoryRead(editdCategory)

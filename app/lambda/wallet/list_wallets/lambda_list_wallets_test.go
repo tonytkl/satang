@@ -19,6 +19,17 @@ type mockWalletService struct {
 	listWalletsFunc func(ctx context.Context, ownerID string, nextToken string, limit int32) ([]wallet.Wallet, string, error)
 }
 
+func TestListWalletsLambdaHandleServiceDeadline(t *testing.T) {
+	handler := &listWalletsLambda{service: &mockWalletService{
+		listWalletsFunc: func(context.Context, string, string, int32) ([]wallet.Wallet, string, error) {
+			return nil, "", context.DeadlineExceeded
+		},
+	}}
+	response, err := handler.Handle(context.Background(), events.APIGatewayV2HTTPRequest{})
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusGatewayTimeout, response.StatusCode)
+}
+
 func (m *mockWalletService) CreateWallet(ctx context.Context, ownerID string, name string, currency string, balance float64, walletType string) (wallet.Wallet, error) {
 	return wallet.Wallet{}, nil
 }

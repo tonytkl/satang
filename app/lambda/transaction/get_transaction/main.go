@@ -57,7 +57,7 @@ func (handler *getTransactionLambda) Handle(ctx context.Context, request events.
 		if errors.Is(err, transaction.ErrTransactionNotFound) {
 			return utils.JsonResponse(http.StatusNotFound, errorResponse{Message: "Transaction not found"})
 		}
-		return utils.JsonResponse(http.StatusBadRequest, errorResponse{Message: err.Error()})
+		return utils.JsonResponse(utils.ErrorStatusCode(err), errorResponse{Message: err.Error()})
 	}
 
 	if tx == nil {

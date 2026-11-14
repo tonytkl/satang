@@ -428,12 +428,33 @@ func TestHandle_ServiceError(t *testing.T) {
 	response, err := handler.Handle(context.Background(), request)
 
 	require.NoError(t, err)
-	assert.Equal(t, http.StatusBadRequest, response.StatusCode)
+	assert.Equal(t, http.StatusInternalServerError, response.StatusCode)
 
 	var errResp errorResponse
 	err = json.Unmarshal([]byte(response.Body), &errResp)
 	require.NoError(t, err)
 	assert.Equal(t, "database error", errResp.Message)
+}
+
+func TestHandle_ServiceDeadline(t *testing.T) {
+	service := &MockTransactionService{
+		CreateTransactionFunc: func(context.Context, string, string, string, string, string, string, string, string, float64, time.Time, string) error {
+			return context.DeadlineExceeded
+		},
+	}
+	response, err := (&createTransactionLambda{service: service}).Handle(context.Background(), events.APIGatewayV2HTTPRequest{
+		Body: `{"walletId":"w","walletName":"wallet","categoryId":"c","categoryName":"category","currency":"THB","type":"expense","amount":1,"date":"2025-05-17"}`,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusGatewayTimeout, response.StatusCode)
+}
+
+func TestHandle_InvalidTransactionType(t *testing.T) {
+	response, err := (&createTransactionLambda{service: transaction.NewService(nil)}).Handle(context.Background(), events.APIGatewayV2HTTPRequest{
+		Body: `{"walletId":"w","walletName":"wallet","categoryId":"c","categoryName":"category","currency":"THB","type":"invalid","amount":1,"date":"2025-05-17"}`,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusBadRequest, response.StatusCode)
 }
 
 func TestHandle_ValidDateInRFC3339Format(t *testing.T) {

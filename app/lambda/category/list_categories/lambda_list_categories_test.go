@@ -28,6 +28,17 @@ func (m *mockListCategoriesService) ListCategories(ctx context.Context, ownerID 
 
 var _ category.Service = (*mockListCategoriesService)(nil)
 
+func TestListCategoriesLambdaHandleServiceDeadline(t *testing.T) {
+	handler := &listCategorysLambda{service: &mockListCategoriesService{
+		listCategoriesFunc: func(context.Context, string, string, int32) ([]category.Category, string, error) {
+			return nil, "", context.DeadlineExceeded
+		},
+	}}
+	response, err := handler.Handle(context.Background(), events.APIGatewayV2HTTPRequest{})
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusGatewayTimeout, response.StatusCode)
+}
+
 func TestListCategoriesLambdaHandleSuccess(t *testing.T) {
 	expectedNextToken := "next-token-1"
 	createdAt := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)

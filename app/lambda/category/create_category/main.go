@@ -68,7 +68,7 @@ func (handler *createCategoryLambda) Handle(ctx context.Context, request events.
 		payload.CategoryType,
 	)
 	if err != nil {
-		return utils.JsonResponse(http.StatusBadRequest, errorResponse{Message: err.Error()})
+		return utils.JsonResponse(utils.ErrorStatusCode(err), errorResponse{Message: err.Error()})
 	}
 
 	categoryResponse := category.BuildCategoryRead(createdCategory)

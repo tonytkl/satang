@@ -56,7 +56,7 @@ func (handler *getCategoryLambda) Handle(ctx context.Context, request events.API
 		if errors.Is(err, category.ErrCategoryNotFound) {
 			return utils.JsonResponse(http.StatusNotFound, errorResponse{Message: "Category not found"})
 		}
-		return utils.JsonResponse(http.StatusBadRequest, errorResponse{Message: err.Error()})
+		return utils.JsonResponse(utils.ErrorStatusCode(err), errorResponse{Message: err.Error()})
 	}
 	if c == (category.Category{}) {
 		return utils.JsonResponse(http.StatusNotFound, errorResponse{Message: "Category not found"})

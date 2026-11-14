@@ -118,8 +118,19 @@ func TestGetTransactionLambda_Handle(t *testing.T) {
 					return nil, errors.New("db error")
 				},
 			},
-			wantStatusCode: 400,
+			wantStatusCode: 500,
 			wantBody:       "db error",
+		},
+		{
+			name:          "service deadline",
+			transactionID: "timeout",
+			service: &mockTransactionService{
+				getTransactionFunc: func(context.Context, string) (*transaction.Transaction, error) {
+					return nil, context.DeadlineExceeded
+				},
+			},
+			wantStatusCode: 504,
+			wantBody:       context.DeadlineExceeded.Error(),
 		},
 		{
 			name:          "missing transaction_id",

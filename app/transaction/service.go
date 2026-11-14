@@ -51,7 +51,7 @@ func (service *transactionService) PrepareCreateTransaction(walletID string, wal
 func buildTransaction(walletID string, walletName string, categoryID string, categoryName string, description string, currency string, imageURL string, txType string, amount float64, date time.Time, ownerID string) (*Transaction, error) {
 	transactionType, err := getTransactionType(txType)
 	if err != nil {
-		return nil, err
+		return nil, utils.ValidationError(err)
 	}
 	transaction := NewTransaction(
 		walletID,
@@ -67,7 +67,7 @@ func buildTransaction(walletID string, walletName string, categoryID string, cat
 		ownerID,
 	)
 	if err := validateTransaction(transaction); err != nil {
-		return nil, err
+		return nil, utils.ValidationError(err)
 	}
 	return transaction, nil
 }
@@ -101,10 +101,10 @@ func (service *transactionService) ListTransactions(ctx context.Context, ownerID
 		fromDate = fromDate.UTC()
 	}
 	if fromDate.After(toDate) {
-		return nil, "", errors.New("from date must not be after to date")
+		return nil, "", utils.ValidationError(errors.New("from date must not be after to date"))
 	}
 	if limit < 0 {
-		return nil, "", errors.New("limit must be greater than or equal to 0")
+		return nil, "", utils.ValidationError(errors.New("limit must be greater than or equal to 0"))
 	}
 
 	// Default pagination size if not set

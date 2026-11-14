@@ -89,7 +89,7 @@ func (handler *createTransactionLambda) Handle(ctx context.Context, request even
 		ownerID,
 	)
 	if err != nil {
-		return utils.JsonResponse(http.StatusBadRequest, errorResponse{Message: err.Error()})
+		return utils.JsonResponse(utils.ErrorStatusCode(err), errorResponse{Message: err.Error()})
 	}
 
 	return events.APIGatewayV2HTTPResponse{

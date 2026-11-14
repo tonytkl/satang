@@ -12,6 +12,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/tonytkl/satang/utils"
 )
 
 type testTransaction struct {
@@ -322,6 +323,7 @@ func TestDynamoDBQueryItemsWithPaginationInvalidToken(t *testing.T) {
 	)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "decode pagination token")
+	assert.Equal(t, http.StatusBadRequest, utils.ErrorStatusCode(err))
 }
 
 func TestDynamoDBScanItems(t *testing.T) {

@@ -34,7 +34,7 @@ func (service *service) CreateCategory(ctx context.Context, ownerID string, name
 	categoryID := utils.GetUUID()
 	categoryType, err := getCategoryType(strCategoryType)
 	if err != nil {
-		return Category{}, err
+		return Category{}, utils.ValidationError(err)
 	}
 	category := NewCategory(
 		categoryID,
@@ -86,7 +86,7 @@ func (service *service) EditCategory(ctx context.Context, ownerID string, catego
 
 		categoryType, err := getCategoryType(strCategoryType)
 		if err != nil {
-			return Category{}, err
+			return Category{}, utils.ValidationError(err)
 		}
 		changedFields["Type"] = categoryType
 	}

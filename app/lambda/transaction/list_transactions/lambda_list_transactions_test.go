@@ -19,6 +19,29 @@ type mockTransactionService struct {
 	getTransactionsBetweenPeriodFunc func(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, nextToken string) ([]transaction.Transaction, string, error)
 }
 
+func TestListTransactionsLambdaHandleServiceDeadline(t *testing.T) {
+	handler := &listTransactionsLambda{service: &mockTransactionService{
+		getTransactionsBetweenPeriodFunc: func(context.Context, string, time.Time, time.Time, int32, string) ([]transaction.Transaction, string, error) {
+			return nil, "", context.DeadlineExceeded
+		},
+	}}
+	response, err := handler.Handle(context.Background(), events.APIGatewayV2HTTPRequest{})
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusGatewayTimeout, response.StatusCode)
+}
+
+func TestListTransactionsLambdaHandleInvalidRangeAndLimit(t *testing.T) {
+	handler := &listTransactionsLambda{service: transaction.NewService(nil)}
+	for _, query := range []map[string]string{
+		{"fromDate": "2025-06-01", "toDate": "2025-05-01"},
+		{"limit": "-1"},
+	} {
+		response, err := handler.Handle(context.Background(), events.APIGatewayV2HTTPRequest{QueryStringParameters: query})
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusBadRequest, response.StatusCode)
+	}
+}
+
 func (m *mockTransactionService) CreateTransaction(ctx context.Context, walletID, walletName, categoryID, categoryName, description, currency, imageURL, txType string, amount float64, date time.Time, ownerID string) error {
 	return nil
 }

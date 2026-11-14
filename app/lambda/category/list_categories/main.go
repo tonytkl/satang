@@ -72,7 +72,7 @@ func (handler *listCategorysLambda) Handle(ctx context.Context, request events.A
 
 	categorys, nextToken, err := handler.service.ListCategories(ctx, ownerID, nextTokenQuery, limit)
 	if err != nil {
-		return utils.JsonResponse(http.StatusInternalServerError, errorResponse{Message: err.Error()})
+		return utils.JsonResponse(utils.ErrorStatusCode(err), errorResponse{Message: err.Error()})
 	}
 
 	responseCategorys := category.BuildCategoryReadList(categorys)

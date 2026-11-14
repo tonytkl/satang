@@ -66,7 +66,7 @@ func (service *service) buildWallet(ownerID string, name string, currency string
 	walletID := utils.GetUUID()
 	walletType, err := getWalletType(strWalletType)
 	if err != nil {
-		return wallet, err
+		return wallet, utils.ValidationError(err)
 	}
 	wallet = NewWallet(
 		walletID,
@@ -131,7 +131,7 @@ func (service *service) EditWallet(ctx context.Context, ownerID string, walletID
 
 		categoryType, err := getWalletType(strCategoryType)
 		if err != nil {
-			return Wallet{}, err
+			return Wallet{}, utils.ValidationError(err)
 		}
 		changedFields["Type"] = categoryType
 	}

@@ -158,6 +158,27 @@ func TestCategoryRepositoryEditCategory(t *testing.T) {
 	assert.Equal(t, "Travel", got.Name)
 }
 
+func TestCategoryRepositoryEditCategoryErrors(t *testing.T) {
+	for _, tt := range []struct {
+		name string
+		err  error
+		want error
+	}{
+		{"upstream deadline", context.DeadlineExceeded, context.DeadlineExceeded},
+		{"missing category", clients.ErrItemNotFound, ErrCategoryNotFound},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			db := &mockCategoryDynamoDB{
+				updateItemFn: func(context.Context, string, map[string]any, string, map[string]any, map[string]string, string, any) error {
+					return tt.err
+				},
+			}
+			_, err := NewRepository(db, "categories").EditCategory(context.Background(), "owner-1", "category-1", map[string]any{"Name": "Travel"})
+			require.ErrorIs(t, err, tt.want)
+		})
+	}
+}
+
 func TestCategoryRepositoryDeleteCategory(t *testing.T) {
 	db := &mockCategoryDynamoDB{
 		deleteItemFn: func(_ context.Context, table string, key map[string]any) error {

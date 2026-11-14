@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/tonytkl/satang/clients"
+	"github.com/tonytkl/satang/utils"
 )
 
 type testModel struct {
@@ -352,6 +353,7 @@ func TestBaseRepositoryUpdate_EmptyPayloadReturnsError(t *testing.T) {
 
 	_, err := repo.Update(context.Background(), "owner-1", "wallet-1", map[string]any{})
 	require.EqualError(t, err, "Update payload is required")
+	assert.Equal(t, 400, utils.ErrorStatusCode(err))
 }
 
 func TestBaseRepositoryUpdate_PropagatesDynamoDBError(t *testing.T) {

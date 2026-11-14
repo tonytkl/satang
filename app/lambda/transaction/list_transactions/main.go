@@ -95,7 +95,7 @@ func (handler *listTransactionsLambda) Handle(ctx context.Context, request event
 	}
 	transactions, nextToken, err := handler.service.ListTransactions(ctx, ownerID, fromDate, toDate, limit, nextTokenQuery)
 	if err != nil {
-		return utils.JsonResponse(http.StatusInternalServerError, errorResponse{Message: err.Error()})
+		return utils.JsonResponse(utils.ErrorStatusCode(err), errorResponse{Message: err.Error()})
 	}
 
 	responseTransactions, err := transaction.BuildTransactionRead(transactions)

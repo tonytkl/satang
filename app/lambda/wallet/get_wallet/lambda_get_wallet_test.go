@@ -19,6 +19,17 @@ type mockGetWalletService struct {
 	getWalletFunc func(ctx context.Context, ownerID string, walletID string) (wallet.Wallet, error)
 }
 
+func TestGetWalletLambdaHandleServiceDeadline(t *testing.T) {
+	handler := &getWalletLambda{service: &mockGetWalletService{
+		getWalletFunc: func(context.Context, string, string) (wallet.Wallet, error) {
+			return wallet.Wallet{}, context.DeadlineExceeded
+		},
+	}}
+	response, err := handler.Handle(context.Background(), events.APIGatewayV2HTTPRequest{PathParameters: map[string]string{"wallet_id": "id"}})
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusGatewayTimeout, response.StatusCode)
+}
+
 func (m *mockGetWalletService) CreateWallet(ctx context.Context, ownerID string, name string, currency string, balance float64, walletType string) (wallet.Wallet, error) {
 	return wallet.Wallet{}, nil
 }
@@ -133,7 +144,7 @@ func TestGetWalletLambdaHandleServiceError(t *testing.T) {
 		PathParameters: map[string]string{"wallet_id": "wallet-err"},
 	})
 	require.NoError(t, err)
-	assert.Equal(t, http.StatusBadRequest, response.StatusCode)
+	assert.Equal(t, http.StatusInternalServerError, response.StatusCode)
 
 	var payload errorResponse
 	err = json.Unmarshal([]byte(response.Body), &payload)

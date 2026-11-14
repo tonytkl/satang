@@ -4,13 +4,17 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
 	"github.com/aws/aws-lambda-go/events"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/tonytkl/satang/category"
+	"github.com/tonytkl/satang/clients"
 )
 
 type mockEditCategoryService struct {
@@ -48,7 +52,7 @@ func TestHandle_ValidPayload(t *testing.T) {
 
 	response, err := handler.Handle(context.Background(), events.APIGatewayV2HTTPRequest{
 		PathParameters: map[string]string{"category_id": " category-1 "},
-		Body:           `{"name":"Travel","categoryType":"income"}`,
+		Body:           `{"name":"Travel","type":"income"}`,
 	})
 
 	require.NoError(t, err)
@@ -128,7 +132,7 @@ func TestHandle_ServiceError(t *testing.T) {
 	})
 
 	require.NoError(t, err)
-	assert.Equal(t, http.StatusBadRequest, response.StatusCode)
+	assert.Equal(t, http.StatusInternalServerError, response.StatusCode)
 	assertEditCategoryErrorMessage(t, response, assert.AnError.Error())
 }
 
@@ -146,6 +150,72 @@ func TestHandle_CategoryNotFound(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusNotFound, response.StatusCode)
 	assertEditCategoryErrorMessage(t, response, "Category not found")
+}
+
+func TestHandle_ServiceDeadline(t *testing.T) {
+	handler := &editCategoryLambda{service: &mockEditCategoryService{
+		editCategoryFunc: func(context.Context, string, string, map[string]any) (category.Category, error) {
+			return category.Category{}, context.DeadlineExceeded
+		},
+	}}
+	response, err := handler.Handle(context.Background(), events.APIGatewayV2HTTPRequest{
+		PathParameters: map[string]string{"category_id": "category-1"}, Body: `{"name":"Travel"}`,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusGatewayTimeout, response.StatusCode)
+}
+
+func TestHandle_InvalidCategoryType(t *testing.T) {
+	handler := &editCategoryLambda{service: category.NewService(nil)}
+	response, err := handler.Handle(context.Background(), events.APIGatewayV2HTTPRequest{
+		PathParameters: map[string]string{"category_id": "id"}, Body: `{"type":"invalid"}`,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusBadRequest, response.StatusCode)
+}
+
+func TestHandle_EmptyUpdate(t *testing.T) {
+	handler := &editCategoryLambda{service: category.NewService(category.NewRepository(nil, "categories"))}
+	response, err := handler.Handle(context.Background(), events.APIGatewayV2HTTPRequest{
+		PathParameters: map[string]string{"category_id": "id"}, Body: `{}`,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusBadRequest, response.StatusCode)
+	assertEditCategoryErrorMessage(t, response, "Update payload is required")
+}
+
+func TestHandle_DynamoDBUpdateErrors(t *testing.T) {
+	for _, tt := range []struct {
+		name string
+		code string
+		want int
+	}{
+		{"throttled", "ProvisionedThroughputExceededException", http.StatusTooManyRequests},
+		{"missing category", "ConditionalCheckFailedException", http.StatusNotFound},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/x-amz-json-1.0")
+				w.WriteHeader(http.StatusBadRequest)
+				_ = json.NewEncoder(w).Encode(map[string]string{"__type": tt.code, "message": "update failed"})
+			}))
+			defer server.Close()
+			t.Setenv("ENVIRONMENT", "local")
+			t.Setenv("AWS_DYNAMODB_ENDPOINT", server.URL)
+			db := clients.NewDynamoDBClientWithConfig(aws.Config{
+				Region:      "us-east-1",
+				HTTPClient:  server.Client(),
+				Credentials: aws.NewCredentialsCache(credentials.NewStaticCredentialsProvider("test", "test", "test")),
+				Retryer:     func() aws.Retryer { return aws.NopRetryer{} },
+			})
+			handler := &editCategoryLambda{service: category.NewService(category.NewRepository(db, "categories"))}
+			response, err := handler.Handle(context.Background(), events.APIGatewayV2HTTPRequest{
+				PathParameters: map[string]string{"category_id": "id"}, Body: `{"name":"Travel"}`,
+			})
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, response.StatusCode)
+		})
+	}
 }
 
 func assertEditCategoryErrorMessage(t *testing.T, response events.APIGatewayV2HTTPResponse, expected string) {

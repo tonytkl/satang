@@ -24,8 +24,8 @@ type listWalletsLambda struct {
 }
 
 type listWalletsResponse struct {
-	Wallets   []wallet.WalletRead `json:"wallets"`
-	NextToken string              `json:"nextToken"`
+	Wallets    []wallet.WalletRead `json:"wallets"`
+	NextCursor string              `json:"nextCursor"`
 }
 
 func main() {
@@ -53,7 +53,7 @@ func (handler *listWalletsLambda) Handle(ctx context.Context, request events.API
 	ownerID := "1"
 
 	// Pagination
-	nextTokenQuery := request.QueryStringParameters["nextToken"]
+	cursorQuery := request.QueryStringParameters["cursor"]
 	limitQuery := request.QueryStringParameters["limit"]
 
 	var limit int32
@@ -70,7 +70,7 @@ func (handler *listWalletsLambda) Handle(ctx context.Context, request events.API
 		limit = int32(parsedLimit)
 	}
 
-	wallets, nextToken, err := handler.service.ListWallets(ctx, ownerID, nextTokenQuery, limit)
+	wallets, cursor, err := handler.service.ListWallets(ctx, ownerID, cursorQuery, limit)
 	if err != nil {
 		return utils.JsonResponse(utils.ErrorStatusCode(err), errorResponse{Message: err.Error()})
 	}
@@ -78,8 +78,8 @@ func (handler *listWalletsLambda) Handle(ctx context.Context, request events.API
 	responseWallets := wallet.BuildWalletReadList(wallets)
 
 	response := listWalletsResponse{
-		Wallets:   responseWallets,
-		NextToken: nextToken,
+		Wallets:    responseWallets,
+		NextCursor: cursor,
 	}
 	return utils.JsonResponse(http.StatusOK, response)
 }

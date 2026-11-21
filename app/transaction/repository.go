@@ -22,7 +22,7 @@ type Repository interface {
 	GetTransaction(ctx context.Context, ownerID string, transactionID string) (*Transaction, error)
 	EditTransaction(ctx context.Context, ownerID string, transactionID string, changedFields map[string]any) error
 	DeleteTransaction(ctx context.Context, ownerID string, transactionID string) error
-	ListTransactionsOfSubModel(ctx context.Context, subModelName string, targetID string, ownerID string, fromDate time.Time, toDate time.Time, nextToken string, limit int32) ([]Transaction, string, error)
+	ListTransactionsOfSubModel(ctx context.Context, subModelName string, targetID string, ownerID string, fromDate time.Time, toDate time.Time, cursor string, limit int32) ([]Transaction, string, error)
 }
 
 type transactionRepository struct {
@@ -128,7 +128,7 @@ func (repository *transactionRepository) DeleteTransaction(ctx context.Context, 
 }
 
 // ListByGSI lists transactions using the provided GSI name and partition key prefix.
-func (repository *transactionRepository) ListTransactionsOfSubModel(ctx context.Context, subModelName string, targetID string, ownerID string, fromDate time.Time, toDate time.Time, nextToken string, limit int32) ([]Transaction, string, error) {
+func (repository *transactionRepository) ListTransactionsOfSubModel(ctx context.Context, subModelName string, targetID string, ownerID string, fromDate time.Time, toDate time.Time, cursor string, limit int32) ([]Transaction, string, error) {
 	// Getting partition keys based on models
 	indexName, indexPartitionKey, indexSortingKey, err := getIndexPartitionKeyAndSortingKey(subModelName)
 	if err != nil {
@@ -161,7 +161,7 @@ func (repository *transactionRepository) ListTransactionsOfSubModel(ctx context.
 
 	transactions := []Transaction{}
 
-	encodedNextToken, err := repository.db.QueryItemsWithPagination(
+	encodedNextCursor, err := repository.db.QueryItemsWithPagination(
 		ctx,
 		repository.tableName,
 		queryExpression,
@@ -169,7 +169,7 @@ func (repository *transactionRepository) ListTransactionsOfSubModel(ctx context.
 		indexName,
 		"", // no filter
 		limit,
-		nextToken,
+		cursor,
 		&transactions,
 	)
 
@@ -177,7 +177,7 @@ func (repository *transactionRepository) ListTransactionsOfSubModel(ctx context.
 		return nil, "", fmt.Errorf("query transaction by ID: %w", err)
 	}
 
-	return transactions, encodedNextToken, nil
+	return transactions, encodedNextCursor, nil
 }
 
 // getIndexPartitionKeyAndSortingKey resolves a submodel name to its DynamoDB GSI name and key attributes.

@@ -268,12 +268,12 @@ func (d *DynamoDB) QueryItemsWithPagination(ctx context.Context, table string, k
 		return "", fmt.Errorf("unmarshal query results: %w", err)
 	}
 
-	encodedNextToken, err := encodePaginationToken(result.LastEvaluatedKey)
+	encodedNextCursor, err := encodePaginationToken(result.LastEvaluatedKey)
 	if err != nil {
 		return "", fmt.Errorf("encode pagination token: %w", err)
 	}
 
-	return encodedNextToken, nil
+	return encodedNextCursor, nil
 }
 
 // ScanItems runs a DynamoDB Scan operation and unmarshals the matching items into out.
@@ -466,8 +466,8 @@ func encodePaginationToken(lastEvaluatedKey map[string]types.AttributeValue) (st
 	return base64.StdEncoding.EncodeToString(jsonBytes), nil
 }
 
-func decodePaginationToken(nextToken string) (map[string]types.AttributeValue, error) {
-	jsonBytes, err := base64.StdEncoding.DecodeString(nextToken)
+func decodePaginationToken(cursor string) (map[string]types.AttributeValue, error) {
+	jsonBytes, err := base64.StdEncoding.DecodeString(cursor)
 	if err != nil {
 		return nil, fmt.Errorf("base64 decode token: %w", err)
 	}

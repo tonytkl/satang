@@ -16,12 +16,12 @@ import (
 
 type mockListCategoriesService struct {
 	category.Service
-	listCategoriesFunc func(ctx context.Context, ownerID string, nextToken string, limit int32) ([]category.Category, string, error)
+	listCategoriesFunc func(ctx context.Context, ownerID string, cursor string, limit int32) ([]category.Category, string, error)
 }
 
-func (m *mockListCategoriesService) ListCategories(ctx context.Context, ownerID string, nextToken string, limit int32) ([]category.Category, string, error) {
+func (m *mockListCategoriesService) ListCategories(ctx context.Context, ownerID string, cursor string, limit int32) ([]category.Category, string, error) {
 	if m.listCategoriesFunc != nil {
-		return m.listCategoriesFunc(ctx, ownerID, nextToken, limit)
+		return m.listCategoriesFunc(ctx, ownerID, cursor, limit)
 	}
 	return nil, "", nil
 }
@@ -40,14 +40,14 @@ func TestListCategoriesLambdaHandleServiceDeadline(t *testing.T) {
 }
 
 func TestListCategoriesLambdaHandleSuccess(t *testing.T) {
-	expectedNextToken := "next-token-1"
+	expectedNextCursor := "next-token-1"
 	createdAt := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
 	updatedAt := time.Date(2026, 1, 3, 4, 5, 6, 0, time.UTC)
 	handler := &listCategorysLambda{
 		service: &mockListCategoriesService{
-			listCategoriesFunc: func(ctx context.Context, ownerID string, nextToken string, limit int32) ([]category.Category, string, error) {
+			listCategoriesFunc: func(ctx context.Context, ownerID string, cursor string, limit int32) ([]category.Category, string, error) {
 				assert.Equal(t, "1", ownerID)
-				assert.Equal(t, expectedNextToken, nextToken)
+				assert.Equal(t, expectedNextCursor, cursor)
 				assert.Equal(t, int32(10), limit)
 
 				return []category.Category{{
@@ -64,8 +64,8 @@ func TestListCategoriesLambdaHandleSuccess(t *testing.T) {
 
 	response, err := handler.Handle(context.Background(), events.APIGatewayV2HTTPRequest{
 		QueryStringParameters: map[string]string{
-			"nextToken": expectedNextToken,
-			"limit":     "10",
+			"cursor": expectedNextCursor,
+			"limit":  "10",
 		},
 	})
 
@@ -83,7 +83,7 @@ func TestListCategoriesLambdaHandleSuccess(t *testing.T) {
 		CreatedAt:    createdAt,
 		UpdatedAt:    updatedAt,
 	}, payload.Categorys[0])
-	assert.Equal(t, "next-token-2", payload.NextToken)
+	assert.Equal(t, "next-token-2", payload.NextCursor)
 }
 
 func TestListCategoriesLambdaHandleInvalidLimit(t *testing.T) {

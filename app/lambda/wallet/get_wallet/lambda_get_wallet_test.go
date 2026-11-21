@@ -34,7 +34,7 @@ func (m *mockGetWalletService) CreateWallet(ctx context.Context, ownerID string,
 	return wallet.Wallet{}, nil
 }
 
-func (m *mockGetWalletService) ListWallets(ctx context.Context, ownerID string, nextToken string, limit int32) ([]wallet.Wallet, string, error) {
+func (m *mockGetWalletService) ListWallets(ctx context.Context, ownerID string, cursor string, limit int32) ([]wallet.Wallet, string, error) {
 	return nil, "", nil
 }
 

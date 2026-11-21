@@ -15,7 +15,7 @@ type mockWalletDynamoDB struct {
 	getItemFn                  func(ctx context.Context, table string, key map[string]any, out any) error
 	deleteItemFn               func(ctx context.Context, table string, key map[string]any) error
 	queryItemsFn               func(ctx context.Context, table string, keyConditionExpression string, expressionValues map[string]any, indexName string, filterExpression string, out any) error
-	queryItemsWithPaginationFn func(ctx context.Context, table string, keyConditionExpression string, expressionValues map[string]any, indexName string, filterExpression string, limit int32, nextToken string, out any) (string, error)
+	queryItemsWithPaginationFn func(ctx context.Context, table string, keyConditionExpression string, expressionValues map[string]any, indexName string, filterExpression string, limit int32, cursor string, out any) (string, error)
 	scanItemsFn                func(ctx context.Context, table string, filterExpression string, expressionValues map[string]any, out any) error
 }
 
@@ -56,9 +56,9 @@ func (m *mockWalletDynamoDB) QueryItems(ctx context.Context, table string, keyCo
 	return nil
 }
 
-func (m *mockWalletDynamoDB) QueryItemsWithPagination(ctx context.Context, table string, keyConditionExpression string, expressionValues map[string]any, indexName string, filterExpression string, limit int32, nextToken string, out any) (string, error) {
+func (m *mockWalletDynamoDB) QueryItemsWithPagination(ctx context.Context, table string, keyConditionExpression string, expressionValues map[string]any, indexName string, filterExpression string, limit int32, cursor string, out any) (string, error) {
 	if m.queryItemsWithPaginationFn != nil {
-		return m.queryItemsWithPaginationFn(ctx, table, keyConditionExpression, expressionValues, indexName, filterExpression, limit, nextToken, out)
+		return m.queryItemsWithPaginationFn(ctx, table, keyConditionExpression, expressionValues, indexName, filterExpression, limit, cursor, out)
 	}
 	return "", nil
 }
@@ -89,13 +89,13 @@ func TestWalletRepositoryCreateWallet(t *testing.T) {
 
 func TestWalletRepositoryListWallets(t *testing.T) {
 	db := &mockWalletDynamoDB{
-		queryItemsWithPaginationFn: func(_ context.Context, table string, keyConditionExpression string, expressionValues map[string]any, _, _ string, limit int32, nextToken string, out any) (string, error) {
+		queryItemsWithPaginationFn: func(_ context.Context, table string, keyConditionExpression string, expressionValues map[string]any, _, _ string, limit int32, cursor string, out any) (string, error) {
 			require.Equal(t, "wallets", table)
 			assert.Equal(t, "PK = :ownerPK AND begins_with(SK, :modelPrefix)", keyConditionExpression)
 			assert.Equal(t, "USER#owner-1", expressionValues[":ownerPK"])
 			assert.Equal(t, "WALLET#", expressionValues[":modelPrefix"])
 			assert.Equal(t, int32(10), limit)
-			assert.Equal(t, "tok-1", nextToken)
+			assert.Equal(t, "tok-1", cursor)
 
 			dst, ok := out.(*[]*Wallet)
 			require.True(t, ok)
@@ -105,11 +105,11 @@ func TestWalletRepositoryListWallets(t *testing.T) {
 	}
 
 	repo := NewRepository(db, "wallets")
-	got, nextToken, err := repo.ListWallets(context.Background(), "owner-1", "tok-1", 10)
+	got, cursor, err := repo.ListWallets(context.Background(), "owner-1", "tok-1", 10)
 	require.NoError(t, err)
 	require.Len(t, got, 1)
 	assert.Equal(t, "wallet-1", got[0].ID)
-	assert.Equal(t, "tok-2", nextToken)
+	assert.Equal(t, "tok-2", cursor)
 }
 
 func TestWalletRepositoryGetWallet(t *testing.T) {

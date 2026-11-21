@@ -24,8 +24,8 @@ type listCategorysLambda struct {
 }
 
 type listCategorysResponse struct {
-	Categorys []category.CategoryRead `json:"categories"`
-	NextToken string                  `json:"nextToken"`
+	Categorys  []category.CategoryRead `json:"categories"`
+	NextCursor string                  `json:"nextCursor"`
 }
 
 func main() {
@@ -53,7 +53,7 @@ func (handler *listCategorysLambda) Handle(ctx context.Context, request events.A
 	ownerID := "1"
 
 	// Pagination
-	nextTokenQuery := request.QueryStringParameters["nextToken"]
+	cursorQuery := request.QueryStringParameters["cursor"]
 	limitQuery := request.QueryStringParameters["limit"]
 
 	var limit int32
@@ -70,7 +70,7 @@ func (handler *listCategorysLambda) Handle(ctx context.Context, request events.A
 		limit = int32(parsedLimit)
 	}
 
-	categorys, nextToken, err := handler.service.ListCategories(ctx, ownerID, nextTokenQuery, limit)
+	categorys, cursor, err := handler.service.ListCategories(ctx, ownerID, cursorQuery, limit)
 	if err != nil {
 		return utils.JsonResponse(utils.ErrorStatusCode(err), errorResponse{Message: err.Error()})
 	}
@@ -78,8 +78,8 @@ func (handler *listCategorysLambda) Handle(ctx context.Context, request events.A
 	responseCategorys := category.BuildCategoryReadList(categorys)
 
 	response := listCategorysResponse{
-		Categorys: responseCategorys,
-		NextToken: nextToken,
+		Categorys:  responseCategorys,
+		NextCursor: cursor,
 	}
 	return utils.JsonResponse(http.StatusOK, response)
 }

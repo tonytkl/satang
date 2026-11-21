@@ -35,19 +35,19 @@ func (m *MockTransactionService) GetTransaction(ctx context.Context, transaction
 	return nil, nil
 }
 
-func (m *MockTransactionService) GetTransactionsBetweenPeriod(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, nextToken string) ([]transaction.Transaction, string, error) {
+func (m *MockTransactionService) GetTransactionsBetweenPeriod(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, cursor string) ([]transaction.Transaction, string, error) {
 	return nil, "", nil
 }
 
-func (m *MockTransactionService) ListTransactions(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, nextToken string) ([]transaction.Transaction, string, error) {
+func (m *MockTransactionService) ListTransactions(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, cursor string) ([]transaction.Transaction, string, error) {
 	return nil, "", nil
 }
 
-func (m *MockTransactionService) ListTransactionsOfCategory(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, nextToken string, categoryID string) ([]transaction.Transaction, string, error) {
+func (m *MockTransactionService) ListTransactionsOfCategory(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, cursor string, categoryID string) ([]transaction.Transaction, string, error) {
 	return nil, "", nil
 }
 
-func (m *MockTransactionService) ListTransactionsOfWallet(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, nextToken string, wallet string) ([]transaction.Transaction, string, error) {
+func (m *MockTransactionService) ListTransactionsOfWallet(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, cursor string, wallet string) ([]transaction.Transaction, string, error) {
 	return nil, "", nil
 }
 

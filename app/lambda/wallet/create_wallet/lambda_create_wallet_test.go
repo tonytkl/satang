@@ -32,7 +32,7 @@ func (m *MockWalletService) PrepareCreateWallet(ownerID string, name string, cur
 	return wallet.Wallet{}, clients.WriteOp{Table: "wallet"}, nil
 }
 
-func (m *MockWalletService) ListWallets(ctx context.Context, ownerID string, nextToken string, limit int32) ([]wallet.Wallet, string, error) {
+func (m *MockWalletService) ListWallets(ctx context.Context, ownerID string, cursor string, limit int32) ([]wallet.Wallet, string, error) {
 	return nil, "", nil
 }
 

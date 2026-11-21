@@ -61,7 +61,7 @@ type mockDynamoDB struct {
 	getItemFn                  func(ctx context.Context, table string, key map[string]any, out any) error
 	deleteItemFn               func(ctx context.Context, table string, key map[string]any) error
 	queryItemsFn               func(ctx context.Context, table string, keyConditionExpression string, expressionValues map[string]any, indexName string, filterExpression string, out any) error
-	queryItemsWithPaginationFn func(ctx context.Context, table string, keyConditionExpression string, expressionValues map[string]any, indexName string, filterExpression string, limit int32, nextToken string, out any) (string, error)
+	queryItemsWithPaginationFn func(ctx context.Context, table string, keyConditionExpression string, expressionValues map[string]any, indexName string, filterExpression string, limit int32, cursor string, out any) (string, error)
 	scanItemsFn                func(ctx context.Context, table string, filterExpression string, expressionValues map[string]any, out any) error
 }
 
@@ -102,9 +102,9 @@ func (m *mockDynamoDB) QueryItems(ctx context.Context, table string, keyConditio
 	return nil
 }
 
-func (m *mockDynamoDB) QueryItemsWithPagination(ctx context.Context, table string, keyConditionExpression string, expressionValues map[string]any, indexName string, filterExpression string, limit int32, nextToken string, out any) (string, error) {
+func (m *mockDynamoDB) QueryItemsWithPagination(ctx context.Context, table string, keyConditionExpression string, expressionValues map[string]any, indexName string, filterExpression string, limit int32, cursor string, out any) (string, error) {
 	if m.queryItemsWithPaginationFn != nil {
-		return m.queryItemsWithPaginationFn(ctx, table, keyConditionExpression, expressionValues, indexName, filterExpression, limit, nextToken, out)
+		return m.queryItemsWithPaginationFn(ctx, table, keyConditionExpression, expressionValues, indexName, filterExpression, limit, cursor, out)
 	}
 	return "", nil
 }
@@ -244,13 +244,13 @@ func TestBaseRepositoryGet_PropagatesDynamoDBError(t *testing.T) {
 
 func TestBaseRepositoryList_Success(t *testing.T) {
 	db := &mockDynamoDB{
-		queryItemsWithPaginationFn: func(_ context.Context, table string, keyConditionExpression string, expressionValues map[string]any, _, _ string, limit int32, nextToken string, out any) (string, error) {
+		queryItemsWithPaginationFn: func(_ context.Context, table string, keyConditionExpression string, expressionValues map[string]any, _, _ string, limit int32, cursor string, out any) (string, error) {
 			require.Equal(t, "wallets", table)
 			assert.Equal(t, "PK = :ownerPK AND begins_with(SK, :modelPrefix)", keyConditionExpression)
 			assert.Equal(t, "USER#owner-1", expressionValues[":ownerPK"])
 			assert.Equal(t, "WALLET#", expressionValues[":modelPrefix"])
 			assert.Equal(t, int32(10), limit)
-			assert.Equal(t, "", nextToken)
+			assert.Equal(t, "", cursor)
 
 			dest, ok := out.(*[]*testModel)
 			require.True(t, ok)

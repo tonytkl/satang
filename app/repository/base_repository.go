@@ -29,7 +29,7 @@ type BaseRepository[T SatangModel] interface {
 	// PrepareSave builds an insert op (fails if the item exists) for use in an atomic write.
 	PrepareSave(item T) clients.WriteOp
 	Get(ctx context.Context, ownerID string, itemID string) (T, error)
-	List(ctx context.Context, ownerID string, nextToken string, limit int32) ([]T, string, error)
+	List(ctx context.Context, ownerID string, cursor string, limit int32) ([]T, string, error)
 	Update(ctx context.Context, ownerID string, itemID string, changedFields map[string]any) (T, error)
 	Delete(ctx context.Context, ownerID string, itemID string) error
 }
@@ -118,7 +118,7 @@ func (repository *baseRepository[T]) Get(ctx context.Context, ownerID string, it
 	return item, nil
 }
 
-func (repository *baseRepository[T]) List(ctx context.Context, ownerID string, nextToken string, limit int32) ([]T, string, error) {
+func (repository *baseRepository[T]) List(ctx context.Context, ownerID string, cursor string, limit int32) ([]T, string, error) {
 	if ownerID == "" {
 		return nil, "", errors.New("owner ID is required")
 	}
@@ -129,7 +129,7 @@ func (repository *baseRepository[T]) List(ctx context.Context, ownerID string, n
 	}
 
 	var items []T
-	encodedNextToken, err := repository.db.QueryItemsWithPagination(
+	encodedNextCursor, err := repository.db.QueryItemsWithPagination(
 		ctx,
 		repository.tableName,
 		queryExpression,
@@ -137,7 +137,7 @@ func (repository *baseRepository[T]) List(ctx context.Context, ownerID string, n
 		"",
 		"",
 		limit,
-		nextToken,
+		cursor,
 		&items,
 	)
 
@@ -145,7 +145,7 @@ func (repository *baseRepository[T]) List(ctx context.Context, ownerID string, n
 		return nil, "", fmt.Errorf("Errors on List: %w", err)
 	}
 
-	return items, encodedNextToken, nil
+	return items, encodedNextCursor, nil
 }
 
 func (repository *baseRepository[T]) Update(ctx context.Context, ownerID string, itemID string, changedFields map[string]any) (T, error) {

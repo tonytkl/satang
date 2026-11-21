@@ -256,7 +256,7 @@ func TestDynamoDBQueryItemsWithIndex(t *testing.T) {
 }
 
 func TestDynamoDBQueryItemsWithPagination(t *testing.T) {
-	nextToken, err := encodePaginationToken(map[string]types.AttributeValue{
+	cursor, err := encodePaginationToken(map[string]types.AttributeValue{
 		"PK": &types.AttributeValueMemberS{Value: "USER#user-1"},
 		"SK": &types.AttributeValueMemberS{Value: "TX#2026-04-01#tx-1"},
 	})
@@ -295,7 +295,7 @@ func TestDynamoDBQueryItemsWithPagination(t *testing.T) {
 		"",
 		"",
 		10,
-		nextToken,
+		cursor,
 		&got,
 	)
 	require.NoError(t, err)

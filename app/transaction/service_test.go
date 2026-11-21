@@ -16,7 +16,7 @@ import (
 type mockTransactionRepository struct {
 	createTransactionFn          func(ctx context.Context, transaction *Transaction) error
 	getTransactionFn             func(ctx context.Context, ownerID string, transactionID string) (*Transaction, error)
-	listTransactionsOfSubModelFn func(ctx context.Context, subModelName string, targetID string, ownerID string, fromDate time.Time, toDate time.Time, nextToken string, limit int32) ([]Transaction, string, error)
+	listTransactionsOfSubModelFn func(ctx context.Context, subModelName string, targetID string, ownerID string, fromDate time.Time, toDate time.Time, cursor string, limit int32) ([]Transaction, string, error)
 	editTransactionFn            func(ctx context.Context, ownerID string, transactionID string, changedFields map[string]any) error
 	deleteTransactionFn          func(ctx context.Context, ownerID string, transactionID string) error
 }
@@ -51,9 +51,9 @@ func (m *mockTransactionRepository) DeleteTransaction(ctx context.Context, owner
 	return nil
 }
 
-func (m *mockTransactionRepository) ListTransactionsOfSubModel(ctx context.Context, subModelName string, targetID string, ownerID string, fromDate time.Time, toDate time.Time, nextToken string, limit int32) ([]Transaction, string, error) {
+func (m *mockTransactionRepository) ListTransactionsOfSubModel(ctx context.Context, subModelName string, targetID string, ownerID string, fromDate time.Time, toDate time.Time, cursor string, limit int32) ([]Transaction, string, error) {
 	if m.listTransactionsOfSubModelFn != nil {
-		return m.listTransactionsOfSubModelFn(ctx, subModelName, targetID, ownerID, fromDate, toDate, nextToken, limit)
+		return m.listTransactionsOfSubModelFn(ctx, subModelName, targetID, ownerID, fromDate, toDate, cursor, limit)
 	}
 	return nil, "", nil
 }
@@ -411,14 +411,14 @@ func TestListTransactionsDefaultsAndDelegatesToRepository(t *testing.T) {
 	to := time.Date(2026, time.April, 30, 0, 0, 0, 0, time.UTC)
 
 	mock := &mockTransactionRepository{
-		listTransactionsOfSubModelFn: func(ctx context.Context, subModelName string, targetID string, ownerID string, fromDate time.Time, toDate time.Time, nextToken string, limit int32) ([]Transaction, string, error) {
+		listTransactionsOfSubModelFn: func(ctx context.Context, subModelName string, targetID string, ownerID string, fromDate time.Time, toDate time.Time, cursor string, limit int32) ([]Transaction, string, error) {
 			assert.Equal(t, "date", subModelName)
 			assert.Equal(t, "", targetID)
 			assert.Equal(t, "user-1", ownerID)
 			assert.Equal(t, from, fromDate)
 			assert.Equal(t, to, toDate)
 			assert.Equal(t, int32(25), limit)
-			assert.Equal(t, "token-1", nextToken)
+			assert.Equal(t, "token-1", cursor)
 			return []Transaction{{ID: "tx-1"}}, "token-2", nil
 		},
 	}
@@ -451,14 +451,14 @@ func TestListTransactionsOfCategoryDelegatesToRepository(t *testing.T) {
 	to := time.Date(2026, time.April, 30, 0, 0, 0, 0, time.UTC)
 
 	mock := &mockTransactionRepository{
-		listTransactionsOfSubModelFn: func(ctx context.Context, subModelName string, targetID string, ownerID string, fromDate time.Time, toDate time.Time, nextToken string, limit int32) ([]Transaction, string, error) {
+		listTransactionsOfSubModelFn: func(ctx context.Context, subModelName string, targetID string, ownerID string, fromDate time.Time, toDate time.Time, cursor string, limit int32) ([]Transaction, string, error) {
 			assert.Equal(t, "category", subModelName)
 			assert.Equal(t, "category-1", targetID)
 			assert.Equal(t, "user-1", ownerID)
 			assert.Equal(t, from, fromDate)
 			assert.Equal(t, to, toDate)
 			assert.Equal(t, int32(15), limit)
-			assert.Equal(t, "token-1", nextToken)
+			assert.Equal(t, "token-1", cursor)
 			return []Transaction{{ID: "tx-2"}}, "token-3", nil
 		},
 	}
@@ -476,14 +476,14 @@ func TestListTransactionsOfWalletDelegatesToRepository(t *testing.T) {
 	to := time.Date(2026, time.April, 30, 0, 0, 0, 0, time.UTC)
 
 	mock := &mockTransactionRepository{
-		listTransactionsOfSubModelFn: func(ctx context.Context, subModelName string, targetID string, ownerID string, fromDate time.Time, toDate time.Time, nextToken string, limit int32) ([]Transaction, string, error) {
+		listTransactionsOfSubModelFn: func(ctx context.Context, subModelName string, targetID string, ownerID string, fromDate time.Time, toDate time.Time, cursor string, limit int32) ([]Transaction, string, error) {
 			assert.Equal(t, "wallet", subModelName)
 			assert.Equal(t, "wallet-1", targetID)
 			assert.Equal(t, "user-1", ownerID)
 			assert.Equal(t, from, fromDate)
 			assert.Equal(t, to, toDate)
 			assert.Equal(t, int32(20), limit)
-			assert.Equal(t, "token-2", nextToken)
+			assert.Equal(t, "token-2", cursor)
 			return []Transaction{{ID: "tx-3"}}, "token-4", nil
 		},
 	}

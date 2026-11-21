@@ -10,7 +10,7 @@ import (
 
 type Service interface {
 	CreateCategory(ctx context.Context, ownerID string, name string, strCategoryType string) (Category, error)
-	ListCategories(ctx context.Context, ownerID string, nextToken string, limit int32) ([]Category, string, error)
+	ListCategories(ctx context.Context, ownerID string, cursor string, limit int32) ([]Category, string, error)
 	GetCategory(ctx context.Context, ownerID string, categoryID string) (Category, error)
 	EditCategory(ctx context.Context, ownerID string, categoryID string, changedFields map[string]any) (Category, error)
 	SetActiveCategory(ctx context.Context, ownerID string, categoryID string, isActive bool) (Category, error)
@@ -50,7 +50,7 @@ func (service *service) CreateCategory(ctx context.Context, ownerID string, name
 	return category, nil
 }
 
-func (service *service) ListCategories(ctx context.Context, ownerID string, nextToken string, limit int32) ([]Category, string, error) {
+func (service *service) ListCategories(ctx context.Context, ownerID string, cursor string, limit int32) ([]Category, string, error) {
 	if limit < 0 {
 		return nil, "", errors.New("limit must be greater than or equal to 0")
 	}
@@ -60,7 +60,7 @@ func (service *service) ListCategories(ctx context.Context, ownerID string, next
 	return service.repository.ListCategories(
 		ctx,
 		ownerID,
-		nextToken,
+		cursor,
 		limit,
 	)
 }

@@ -11,7 +11,7 @@ import (
 
 type mockCategoryRepository struct {
 	createCategoryFn func(ctx context.Context, category Category) error
-	listCategoriesFn func(ctx context.Context, ownerID string, nextToken string, limit int32) ([]Category, string, error)
+	listCategoriesFn func(ctx context.Context, ownerID string, cursor string, limit int32) ([]Category, string, error)
 	getCategoryFn    func(ctx context.Context, ownerID string, categoryID string) (Category, error)
 	editCategoryFn   func(ctx context.Context, ownerID string, categoryID string, changedFields map[string]any) (Category, error)
 	deleteCategoryFn func(ctx context.Context, ownerID string, categoryID string) error
@@ -26,9 +26,9 @@ func (m *mockCategoryRepository) CreateCategory(ctx context.Context, category Ca
 	return nil
 }
 
-func (m *mockCategoryRepository) ListCategories(ctx context.Context, ownerID string, nextToken string, limit int32) ([]Category, string, error) {
+func (m *mockCategoryRepository) ListCategories(ctx context.Context, ownerID string, cursor string, limit int32) ([]Category, string, error) {
 	if m.listCategoriesFn != nil {
-		return m.listCategoriesFn(ctx, ownerID, nextToken, limit)
+		return m.listCategoriesFn(ctx, ownerID, cursor, limit)
 	}
 	return nil, "", nil
 }
@@ -134,7 +134,7 @@ func TestEditCategoryRejectsProtectedFields(t *testing.T) {
 func TestListCategoriesUsesDefaultLimitWhenZero(t *testing.T) {
 	var gotLimit int32
 	repo := &mockCategoryRepository{
-		listCategoriesFn: func(ctx context.Context, ownerID string, nextToken string, limit int32) ([]Category, string, error) {
+		listCategoriesFn: func(ctx context.Context, ownerID string, cursor string, limit int32) ([]Category, string, error) {
 			gotLimit = limit
 			return []Category{}, "", nil
 		},
@@ -150,7 +150,7 @@ func TestListCategoriesUsesDefaultLimitWhenZero(t *testing.T) {
 func TestListCategoriesRejectsNegativeLimit(t *testing.T) {
 	repoCalled := false
 	repo := &mockCategoryRepository{
-		listCategoriesFn: func(ctx context.Context, ownerID string, nextToken string, limit int32) ([]Category, string, error) {
+		listCategoriesFn: func(ctx context.Context, ownerID string, cursor string, limit int32) ([]Category, string, error) {
 			repoCalled = true
 			return []Category{}, "", nil
 		},

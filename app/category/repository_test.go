@@ -15,7 +15,7 @@ type mockCategoryDynamoDB struct {
 	getItemFn                  func(ctx context.Context, table string, key map[string]any, out any) error
 	deleteItemFn               func(ctx context.Context, table string, key map[string]any) error
 	queryItemsFn               func(ctx context.Context, table string, keyConditionExpression string, expressionValues map[string]any, indexName string, filterExpression string, out any) error
-	queryItemsWithPaginationFn func(ctx context.Context, table string, keyConditionExpression string, expressionValues map[string]any, indexName string, filterExpression string, limit int32, nextToken string, out any) (string, error)
+	queryItemsWithPaginationFn func(ctx context.Context, table string, keyConditionExpression string, expressionValues map[string]any, indexName string, filterExpression string, limit int32, cursor string, out any) (string, error)
 	scanItemsFn                func(ctx context.Context, table string, filterExpression string, expressionValues map[string]any, out any) error
 }
 
@@ -56,9 +56,9 @@ func (m *mockCategoryDynamoDB) QueryItems(ctx context.Context, table string, key
 	return nil
 }
 
-func (m *mockCategoryDynamoDB) QueryItemsWithPagination(ctx context.Context, table string, keyConditionExpression string, expressionValues map[string]any, indexName string, filterExpression string, limit int32, nextToken string, out any) (string, error) {
+func (m *mockCategoryDynamoDB) QueryItemsWithPagination(ctx context.Context, table string, keyConditionExpression string, expressionValues map[string]any, indexName string, filterExpression string, limit int32, cursor string, out any) (string, error) {
 	if m.queryItemsWithPaginationFn != nil {
-		return m.queryItemsWithPaginationFn(ctx, table, keyConditionExpression, expressionValues, indexName, filterExpression, limit, nextToken, out)
+		return m.queryItemsWithPaginationFn(ctx, table, keyConditionExpression, expressionValues, indexName, filterExpression, limit, cursor, out)
 	}
 	return "", nil
 }
@@ -89,13 +89,13 @@ func TestCategoryRepositoryCreateCategory(t *testing.T) {
 
 func TestCategoryRepositoryListCategories(t *testing.T) {
 	db := &mockCategoryDynamoDB{
-		queryItemsWithPaginationFn: func(_ context.Context, table string, keyConditionExpression string, expressionValues map[string]any, _, _ string, limit int32, nextToken string, out any) (string, error) {
+		queryItemsWithPaginationFn: func(_ context.Context, table string, keyConditionExpression string, expressionValues map[string]any, _, _ string, limit int32, cursor string, out any) (string, error) {
 			require.Equal(t, "categories", table)
 			assert.Equal(t, "PK = :ownerPK AND begins_with(SK, :modelPrefix)", keyConditionExpression)
 			assert.Equal(t, "USER#owner-1", expressionValues[":ownerPK"])
 			assert.Equal(t, "CATEGORY#", expressionValues[":modelPrefix"])
 			assert.Equal(t, int32(5), limit)
-			assert.Equal(t, "tok-1", nextToken)
+			assert.Equal(t, "tok-1", cursor)
 
 			dst, ok := out.(*[]*Category)
 			require.True(t, ok)
@@ -105,11 +105,11 @@ func TestCategoryRepositoryListCategories(t *testing.T) {
 	}
 
 	repo := NewRepository(db, "categories")
-	got, nextToken, err := repo.ListCategories(context.Background(), "owner-1", "tok-1", 5)
+	got, cursor, err := repo.ListCategories(context.Background(), "owner-1", "tok-1", 5)
 	require.NoError(t, err)
 	require.Len(t, got, 1)
 	assert.Equal(t, "category-1", got[0].ID)
-	assert.Equal(t, "tok-2", nextToken)
+	assert.Equal(t, "tok-2", cursor)
 }
 
 func TestCategoryRepositoryGetCategory(t *testing.T) {

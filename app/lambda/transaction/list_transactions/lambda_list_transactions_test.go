@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/tonytkl/satang/transaction"
+	"github.com/tonytkl/satang/utils"
 )
 
 type mockTransactionService struct {
@@ -190,6 +191,24 @@ func TestListTransactionsLambdaHandleServiceError(t *testing.T) {
 	err = json.Unmarshal([]byte(response.Body), &payload)
 	require.NoError(t, err)
 	assert.Equal(t, "database unavailable", payload.Message)
+}
+
+func TestListTransactionsLambdaHandleInvalidCursor(t *testing.T) {
+	handler := &listTransactionsLambda{
+		service: &mockTransactionService{
+			getTransactionsBetweenPeriodFunc: func(_ context.Context, _ string, _ time.Time, _ time.Time, _ int32, cursor string) ([]transaction.Transaction, string, error) {
+				assert.Equal(t, "random", cursor)
+				return nil, "", utils.ValidationError(errors.New("decode cursor failed"))
+			},
+		},
+	}
+
+	response, err := handler.Handle(context.Background(), events.APIGatewayV2HTTPRequest{
+		QueryStringParameters: map[string]string{"cursor": "random"},
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusBadRequest, response.StatusCode)
 }
 
 func TestListTransactionsLambdaHandleInvalidTransactionSchema(t *testing.T) {

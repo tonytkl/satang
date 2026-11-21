@@ -12,6 +12,7 @@ import (
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/tonytkl/satang/utils"
 	"github.com/tonytkl/satang/wallet"
 )
 
@@ -163,6 +164,24 @@ func TestListWalletsLambdaHandleServiceError(t *testing.T) {
 	err = json.Unmarshal([]byte(response.Body), &payload)
 	require.NoError(t, err)
 	assert.Equal(t, "database unavailable", payload.Message)
+}
+
+func TestListWalletsLambdaHandleInvalidCursor(t *testing.T) {
+	handler := &listWalletsLambda{
+		service: &mockWalletService{
+			listWalletsFunc: func(_ context.Context, _ string, cursor string, _ int32) ([]wallet.Wallet, string, error) {
+				assert.Equal(t, "random", cursor)
+				return nil, "", utils.ValidationError(errors.New("decode cursor failed"))
+			},
+		},
+	}
+
+	response, err := handler.Handle(context.Background(), events.APIGatewayV2HTTPRequest{
+		QueryStringParameters: map[string]string{"cursor": "random"},
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusBadRequest, response.StatusCode)
 }
 
 var _ wallet.Service = (*mockWalletService)(nil)

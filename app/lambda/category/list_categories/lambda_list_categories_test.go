@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/tonytkl/satang/category"
+	"github.com/tonytkl/satang/utils"
 )
 
 type mockListCategoriesService struct {
@@ -142,4 +143,22 @@ func TestListCategoriesLambdaHandleServiceError(t *testing.T) {
 	var payload errorResponse
 	require.NoError(t, json.Unmarshal([]byte(response.Body), &payload))
 	assert.Equal(t, "database unavailable", payload.Message)
+}
+
+func TestListCategoriesLambdaHandleInvalidCursor(t *testing.T) {
+	handler := &listCategorysLambda{
+		service: &mockListCategoriesService{
+			listCategoriesFunc: func(_ context.Context, _ string, cursor string, _ int32) ([]category.Category, string, error) {
+				assert.Equal(t, "random", cursor)
+				return nil, "", utils.ValidationError(errors.New("decode cursor failed"))
+			},
+		},
+	}
+
+	response, err := handler.Handle(context.Background(), events.APIGatewayV2HTTPRequest{
+		QueryStringParameters: map[string]string{"cursor": "random"},
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusBadRequest, response.StatusCode)
 }

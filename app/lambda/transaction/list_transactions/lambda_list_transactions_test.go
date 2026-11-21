@@ -198,7 +198,7 @@ func TestListTransactionsLambdaHandleInvalidCursor(t *testing.T) {
 		service: &mockTransactionService{
 			getTransactionsBetweenPeriodFunc: func(_ context.Context, _ string, _ time.Time, _ time.Time, _ int32, cursor string) ([]transaction.Transaction, string, error) {
 				assert.Equal(t, "random", cursor)
-				return nil, "", utils.ValidationError(errors.New("decode cursor failed"))
+				return nil, "", utils.InvalidCursorError(errors.New("decode cursor failed"))
 			},
 		},
 	}
@@ -209,6 +209,9 @@ func TestListTransactionsLambdaHandleInvalidCursor(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusBadRequest, response.StatusCode)
+	var payload errorResponse
+	require.NoError(t, json.Unmarshal([]byte(response.Body), &payload))
+	assert.Equal(t, "Invalid cursor", payload.Message)
 }
 
 func TestListTransactionsLambdaHandleInvalidTransactionSchema(t *testing.T) {

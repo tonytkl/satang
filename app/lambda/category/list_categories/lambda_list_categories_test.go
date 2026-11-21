@@ -150,7 +150,7 @@ func TestListCategoriesLambdaHandleInvalidCursor(t *testing.T) {
 		service: &mockListCategoriesService{
 			listCategoriesFunc: func(_ context.Context, _ string, cursor string, _ int32) ([]category.Category, string, error) {
 				assert.Equal(t, "random", cursor)
-				return nil, "", utils.ValidationError(errors.New("decode cursor failed"))
+				return nil, "", utils.InvalidCursorError(errors.New("decode cursor failed"))
 			},
 		},
 	}
@@ -161,4 +161,7 @@ func TestListCategoriesLambdaHandleInvalidCursor(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusBadRequest, response.StatusCode)
+	var payload errorResponse
+	require.NoError(t, json.Unmarshal([]byte(response.Body), &payload))
+	assert.Equal(t, "Invalid cursor", payload.Message)
 }

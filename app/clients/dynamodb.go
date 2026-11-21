@@ -254,7 +254,7 @@ func (d *DynamoDB) QueryItemsWithPagination(ctx context.Context, table string, k
 	if cursor != "" {
 		exclusiveStartKey, err := decodeCursor(cursor)
 		if err != nil {
-			return "", utils.ValidationError(fmt.Errorf("decode cursor: %w", err))
+			return "", utils.InvalidCursorError(fmt.Errorf("decode cursor: %w", err))
 		}
 		input.ExclusiveStartKey = exclusiveStartKey
 	}

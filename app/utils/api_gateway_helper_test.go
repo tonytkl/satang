@@ -45,3 +45,27 @@ func TestErrorStatusCode(t *testing.T) {
 		})
 	}
 }
+
+func TestErrorMessage(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+		want string
+	}{
+		{
+			name: "invalid cursor hides decoding details",
+			err:  fmt.Errorf("list items: %w", InvalidCursorError(errors.New("base64 decode cursor failed"))),
+			want: "Invalid cursor",
+		},
+		{
+			name: "other errors retain their message",
+			err:  errors.New("database unavailable"),
+			want: "database unavailable",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, ErrorMessage(tt.err))
+		})
+	}
+}

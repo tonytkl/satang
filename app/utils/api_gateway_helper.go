@@ -15,11 +15,24 @@ type validationError struct {
 	err error
 }
 
+var ErrInvalidCursor = errors.New("Invalid cursor")
+
 func (e validationError) Error() string { return e.err.Error() }
 func (e validationError) Unwrap() error { return e.err }
 
 func ValidationError(err error) error {
 	return validationError{err: err}
+}
+
+func InvalidCursorError(err error) error {
+	return ValidationError(fmt.Errorf("%w: %w", ErrInvalidCursor, err))
+}
+
+func ErrorMessage(err error) string {
+	if errors.Is(err, ErrInvalidCursor) {
+		return ErrInvalidCursor.Error()
+	}
+	return err.Error()
 }
 
 // ErrorStatusCode maps classified input and upstream errors to API Gateway statuses.

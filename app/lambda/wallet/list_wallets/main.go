@@ -72,7 +72,7 @@ func (handler *listWalletsLambda) Handle(ctx context.Context, request events.API
 
 	wallets, cursor, err := handler.service.ListWallets(ctx, ownerID, cursorQuery, limit)
 	if err != nil {
-		return utils.JsonResponse(utils.ErrorStatusCode(err), errorResponse{Message: err.Error()})
+		return utils.JsonResponse(utils.ErrorStatusCode(err), errorResponse{Message: utils.ErrorMessage(err)})
 	}
 
 	responseWallets := wallet.BuildWalletReadList(wallets)

@@ -171,7 +171,7 @@ func TestListWalletsLambdaHandleInvalidCursor(t *testing.T) {
 		service: &mockWalletService{
 			listWalletsFunc: func(_ context.Context, _ string, cursor string, _ int32) ([]wallet.Wallet, string, error) {
 				assert.Equal(t, "random", cursor)
-				return nil, "", utils.ValidationError(errors.New("decode cursor failed"))
+				return nil, "", utils.InvalidCursorError(errors.New("decode cursor failed"))
 			},
 		},
 	}
@@ -182,6 +182,9 @@ func TestListWalletsLambdaHandleInvalidCursor(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusBadRequest, response.StatusCode)
+	var payload errorResponse
+	require.NoError(t, json.Unmarshal([]byte(response.Body), &payload))
+	assert.Equal(t, "Invalid cursor", payload.Message)
 }
 
 var _ wallet.Service = (*mockWalletService)(nil)

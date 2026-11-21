@@ -13,7 +13,7 @@ type Service interface {
 	CreateWallet(ctx context.Context, ownerID string, name string, currency string, balance float64, strWalletType string) (Wallet, error)
 	// PrepareCreateWallet validates and builds the wallet plus a write op, without persisting.
 	PrepareCreateWallet(ownerID string, name string, currency string, balance float64, strWalletType string) (Wallet, clients.WriteOp, error)
-	ListWallets(ctx context.Context, ownerID string, nextToken string, limit int32) ([]Wallet, string, error)
+	ListWallets(ctx context.Context, ownerID string, cursor string, limit int32) ([]Wallet, string, error)
 	GetWallet(ctx context.Context, ownerID string, walletID string) (Wallet, error)
 	EditWallet(ctx context.Context, ownerID string, walletID string, changedFields map[string]any) (Wallet, error)
 	SetActiveWallet(ctx context.Context, ownerID string, walletID string, isActive bool) error
@@ -66,7 +66,7 @@ func (service *service) buildWallet(ownerID string, name string, currency string
 	walletID := utils.GetUUID()
 	walletType, err := getWalletType(strWalletType)
 	if err != nil {
-		return wallet, err
+		return wallet, utils.ValidationError(err)
 	}
 	wallet = NewWallet(
 		walletID,
@@ -80,7 +80,7 @@ func (service *service) buildWallet(ownerID string, name string, currency string
 	return wallet, nil
 }
 
-func (service *service) ListWallets(ctx context.Context, ownerID string, nextToken string, limit int32) ([]Wallet, string, error) {
+func (service *service) ListWallets(ctx context.Context, ownerID string, cursor string, limit int32) ([]Wallet, string, error) {
 	if limit < 0 {
 		return nil, "", errors.New("limit must be greater than or equal to 0")
 	}
@@ -90,7 +90,7 @@ func (service *service) ListWallets(ctx context.Context, ownerID string, nextTok
 	return service.repository.ListWallets(
 		ctx,
 		ownerID,
-		nextToken,
+		cursor,
 		limit,
 	)
 }
@@ -131,7 +131,7 @@ func (service *service) EditWallet(ctx context.Context, ownerID string, walletID
 
 		categoryType, err := getWalletType(strCategoryType)
 		if err != nil {
-			return Wallet{}, err
+			return Wallet{}, utils.ValidationError(err)
 		}
 		changedFields["Type"] = categoryType
 	}

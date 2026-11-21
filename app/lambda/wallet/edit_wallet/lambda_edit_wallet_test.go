@@ -17,6 +17,38 @@ type mockWalletService struct {
 	editWalletFunc func(ctx context.Context, ownerID string, walletID string, changedFields map[string]any) (wallet.Wallet, error)
 }
 
+func TestHandle_ServiceDeadline(t *testing.T) {
+	handler := &editWalletLambda{service: &mockWalletService{
+		editWalletFunc: func(context.Context, string, string, map[string]any) (wallet.Wallet, error) {
+			return wallet.Wallet{}, context.DeadlineExceeded
+		},
+	}}
+	response, err := handler.Handle(context.Background(), events.APIGatewayV2HTTPRequest{
+		PathParameters: map[string]string{"wallet_id": "id"}, Body: `{"name":"Travel"}`,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusGatewayTimeout, response.StatusCode)
+}
+
+func TestHandle_InvalidWalletType(t *testing.T) {
+	handler := &editWalletLambda{service: wallet.NewService(nil)}
+	response, err := handler.Handle(context.Background(), events.APIGatewayV2HTTPRequest{
+		PathParameters: map[string]string{"wallet_id": "id"}, Body: `{"walletType":"invalid"}`,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusBadRequest, response.StatusCode)
+}
+
+func TestHandle_EmptyUpdate(t *testing.T) {
+	handler := &editWalletLambda{service: wallet.NewService(wallet.NewRepository(nil, "wallets"))}
+	response, err := handler.Handle(context.Background(), events.APIGatewayV2HTTPRequest{
+		PathParameters: map[string]string{"wallet_id": "id"}, Body: `{}`,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusBadRequest, response.StatusCode)
+	assertErrorMessage(t, response, "Update payload is required")
+}
+
 func (service *mockWalletService) CreateWallet(context.Context, string, string, string, float64, string) (wallet.Wallet, error) {
 	return wallet.Wallet{}, nil
 }
@@ -120,7 +152,7 @@ func TestHandle_ServiceError(t *testing.T) {
 	})
 
 	require.NoError(t, err)
-	assert.Equal(t, http.StatusBadRequest, response.StatusCode)
+	assert.Equal(t, http.StatusInternalServerError, response.StatusCode)
 	assertErrorMessage(t, response, assert.AnError.Error())
 }
 

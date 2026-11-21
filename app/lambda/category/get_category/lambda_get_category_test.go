@@ -28,6 +28,17 @@ func (m *mockGetCategoryService) GetCategory(ctx context.Context, ownerID string
 
 var _ category.Service = (*mockGetCategoryService)(nil)
 
+func TestGetCategoryLambdaHandleServiceDeadline(t *testing.T) {
+	handler := &getCategoryLambda{service: &mockGetCategoryService{
+		getCategoryFunc: func(context.Context, string, string) (category.Category, error) {
+			return category.Category{}, context.DeadlineExceeded
+		},
+	}}
+	response, err := handler.Handle(context.Background(), events.APIGatewayV2HTTPRequest{PathParameters: map[string]string{"category_id": "id"}})
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusGatewayTimeout, response.StatusCode)
+}
+
 func TestGetCategoryLambdaHandleSuccess(t *testing.T) {
 	createdAt := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
 	updatedAt := time.Date(2026, 1, 3, 4, 5, 6, 0, time.UTC)
@@ -122,7 +133,7 @@ func TestGetCategoryLambdaHandleServiceError(t *testing.T) {
 		PathParameters: map[string]string{"category_id": "category-error"},
 	})
 	require.NoError(t, err)
-	assert.Equal(t, http.StatusBadRequest, response.StatusCode)
+	assert.Equal(t, http.StatusInternalServerError, response.StatusCode)
 
 	var payload errorResponse
 	require.NoError(t, json.Unmarshal([]byte(response.Body), &payload))

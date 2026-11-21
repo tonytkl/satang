@@ -77,7 +77,7 @@ func (handler *createWalletLambda) Handle(ctx context.Context, request events.AP
 		payload.WalletType,
 	)
 	if err != nil {
-		return utils.JsonResponse(http.StatusBadRequest, errorResponse{Message: err.Error()})
+		return utils.JsonResponse(utils.ErrorStatusCode(err), errorResponse{Message: err.Error()})
 	}
 
 	ops := []clients.WriteOp{walletOp}
@@ -98,13 +98,13 @@ func (handler *createWalletLambda) Handle(ctx context.Context, request events.AP
 			ownerID,
 		)
 		if err != nil {
-			return utils.JsonResponse(http.StatusBadRequest, errorResponse{Message: err.Error()})
+			return utils.JsonResponse(utils.ErrorStatusCode(err), errorResponse{Message: err.Error()})
 		}
 		ops = append(ops, transactionOp)
 	}
 
 	if err := handler.writer.TransactWrite(ctx, ops...); err != nil {
-		return utils.JsonResponse(http.StatusInternalServerError, errorResponse{Message: err.Error()})
+		return utils.JsonResponse(utils.ErrorStatusCode(err), errorResponse{Message: err.Error()})
 	}
 
 	walletResponse := wallet.BuildWalletRead(createdWallet)

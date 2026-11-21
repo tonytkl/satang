@@ -18,7 +18,7 @@ type mockDynamoDB struct {
 	getItemFn                  func(ctx context.Context, table string, key map[string]any, out any) error
 	deleteItemFn               func(ctx context.Context, table string, key map[string]any) error
 	queryItemsFn               func(ctx context.Context, table string, keyConditionExpression string, expressionValues map[string]any, indexName string, filterExpression string, out any) error
-	queryItemsWithPaginationFn func(ctx context.Context, table string, keyConditionExpression string, expressionValues map[string]any, indexName string, filterExpression string, limit int32, nextToken string, out any) (string, error)
+	queryItemsWithPaginationFn func(ctx context.Context, table string, keyConditionExpression string, expressionValues map[string]any, indexName string, filterExpression string, limit int32, cursor string, out any) (string, error)
 	scanItemsFn                func(ctx context.Context, table string, filterExpression string, expressionValues map[string]any, out any) error
 }
 
@@ -59,9 +59,9 @@ func (m *mockDynamoDB) QueryItems(ctx context.Context, table string, keyConditio
 	return nil
 }
 
-func (m *mockDynamoDB) QueryItemsWithPagination(ctx context.Context, table string, keyConditionExpression string, expressionValues map[string]any, indexName string, filterExpression string, limit int32, nextToken string, out any) (string, error) {
+func (m *mockDynamoDB) QueryItemsWithPagination(ctx context.Context, table string, keyConditionExpression string, expressionValues map[string]any, indexName string, filterExpression string, limit int32, cursor string, out any) (string, error) {
 	if m.queryItemsWithPaginationFn != nil {
-		return m.queryItemsWithPaginationFn(ctx, table, keyConditionExpression, expressionValues, indexName, filterExpression, limit, nextToken, out)
+		return m.queryItemsWithPaginationFn(ctx, table, keyConditionExpression, expressionValues, indexName, filterExpression, limit, cursor, out)
 	}
 
 	if m.queryItemsFn != nil {
@@ -195,13 +195,13 @@ func TestTransactionRepositoryGetTransactionErrors(t *testing.T) {
 
 func TestTransactionRepositoryListTransactionsOfSubModelDateSuccess(t *testing.T) {
 	mock := &mockDynamoDB{
-		queryItemsWithPaginationFn: func(_ context.Context, table string, keyConditionExpression string, expressionValues map[string]any, indexName string, filterExpression string, limit int32, nextToken string, out any) (string, error) {
+		queryItemsWithPaginationFn: func(_ context.Context, table string, keyConditionExpression string, expressionValues map[string]any, indexName string, filterExpression string, limit int32, cursor string, out any) (string, error) {
 			require.Equal(t, "transactions", table)
 			require.Equal(t, "GSI1", indexName)
 			require.Equal(t, "GSI1_PK = :indexPK AND GSI1_SK BETWEEN :from AND :to", keyConditionExpression)
 			require.Empty(t, filterExpression)
 			require.Equal(t, int32(20), limit)
-			require.Equal(t, "token-1", nextToken)
+			require.Equal(t, "token-1", cursor)
 			assert.Equal(t, "USER#user-1", expressionValues[":indexPK"])
 			assert.Equal(t, "TX#2026-04-01#", expressionValues[":from"])
 			assert.Equal(t, "TX#2026-04-30#", expressionValues[":to"])
@@ -216,20 +216,20 @@ func TestTransactionRepositoryListTransactionsOfSubModelDateSuccess(t *testing.T
 	from := time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC)
 	to := time.Date(2026, 4, 30, 0, 0, 0, 0, time.UTC)
 
-	got, nextToken, err := repo.ListTransactionsOfSubModel(context.Background(), "date", "", "user-1", from, to, "token-1", 20)
+	got, cursor, err := repo.ListTransactionsOfSubModel(context.Background(), "date", "", "user-1", from, to, "token-1", 20)
 	require.NoError(t, err)
 	assert.Len(t, got, 2)
-	assert.Equal(t, "token-2", nextToken)
+	assert.Equal(t, "token-2", cursor)
 }
 
 func TestTransactionRepositoryListTransactionsOfSubModelCategorySuccess(t *testing.T) {
 	mock := &mockDynamoDB{
-		queryItemsWithPaginationFn: func(_ context.Context, _ string, keyConditionExpression string, expressionValues map[string]any, indexName string, filterExpression string, limit int32, nextToken string, out any) (string, error) {
+		queryItemsWithPaginationFn: func(_ context.Context, _ string, keyConditionExpression string, expressionValues map[string]any, indexName string, filterExpression string, limit int32, cursor string, out any) (string, error) {
 			require.Equal(t, "GSI3_PK = :indexPK AND GSI3_SK BETWEEN :from AND :to", keyConditionExpression)
 			require.Equal(t, "GSI3", indexName)
 			require.Empty(t, filterExpression)
 			require.Equal(t, int32(10), limit)
-			require.Empty(t, nextToken)
+			require.Empty(t, cursor)
 			assert.Equal(t, "USER#user-1#TX_CATEGORY#cat-1", expressionValues[":indexPK"])
 			assert.Equal(t, "TX#2026-04-01#", expressionValues[":from"])
 			assert.Equal(t, "TX#2026-04-30#", expressionValues[":to"])
@@ -244,10 +244,10 @@ func TestTransactionRepositoryListTransactionsOfSubModelCategorySuccess(t *testi
 	from := time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC)
 	to := time.Date(2026, 4, 30, 0, 0, 0, 0, time.UTC)
 
-	got, nextToken, err := repo.ListTransactionsOfSubModel(context.Background(), "category", "cat-1", "user-1", from, to, "", 10)
+	got, cursor, err := repo.ListTransactionsOfSubModel(context.Background(), "category", "cat-1", "user-1", from, to, "", 10)
 	require.NoError(t, err)
 	assert.Len(t, got, 1)
-	assert.Equal(t, "", nextToken)
+	assert.Equal(t, "", cursor)
 }
 
 func TestTransactionRepositoryListTransactionsOfSubModelErrors(t *testing.T) {

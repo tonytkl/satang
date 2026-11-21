@@ -19,6 +19,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/joho/godotenv"
+	"github.com/tonytkl/satang/utils"
 )
 
 // DynamoDBClient defines the public methods supported by the DynamoDB wrapper.
@@ -29,7 +30,7 @@ type DynamoDBClient interface {
 	UpdateItem(ctx context.Context, table string, key map[string]any, updateExpression string, expressionValues map[string]any, expressionNames map[string]string, conditionExpression string, out any) error
 	GetItem(ctx context.Context, table string, key map[string]any, out any) error
 	DeleteItem(ctx context.Context, table string, key map[string]any) error
-	QueryItemsWithPagination(ctx context.Context, table string, keyConditionExpression string, expressionValues map[string]any, indexName string, filterExpression string, limit int32, paginationToken string, out any) (string, error)
+	QueryItemsWithPagination(ctx context.Context, table string, keyConditionExpression string, expressionValues map[string]any, indexName string, filterExpression string, limit int32, cursor string, out any) (string, error)
 	ScanItems(ctx context.Context, table string, filterExpression string, expressionValues map[string]any, out any) error
 }
 
@@ -226,9 +227,9 @@ func (d *DynamoDB) DeleteItem(ctx context.Context, table string, key map[string]
 //   - indexName: "GSI1" for GSI queries, or "" for table primary index
 //   - filterExpression: "#type = :type" or "" when no filter is needed
 //   - limit: 20 to cap page size, or 0 for default behavior
-//   - paginationToken: token returned by previous call, or "" for first page
+//   - cursor: cursor returned by previous call, or "" for first page
 //   - out: pointer to destination slice, for example &[]Transaction{}
-func (d *DynamoDB) QueryItemsWithPagination(ctx context.Context, table string, keyConditionExpression string, expressionValues map[string]any, indexName string, filterExpression string, limit int32, paginationToken string, out any) (string, error) {
+func (d *DynamoDB) QueryItemsWithPagination(ctx context.Context, table string, keyConditionExpression string, expressionValues map[string]any, indexName string, filterExpression string, limit int32, cursor string, out any) (string, error) {
 	attrValues, err := marshalExpressionValues(expressionValues)
 	if err != nil {
 		return "", fmt.Errorf("marshal expression values: %w", err)
@@ -250,10 +251,10 @@ func (d *DynamoDB) QueryItemsWithPagination(ctx context.Context, table string, k
 	if limit > 0 {
 		input.Limit = aws.Int32(limit)
 	}
-	if paginationToken != "" {
-		exclusiveStartKey, err := decodePaginationToken(paginationToken)
+	if cursor != "" {
+		exclusiveStartKey, err := decodeCursor(cursor)
 		if err != nil {
-			return "", fmt.Errorf("decode pagination token: %w", err)
+			return "", utils.InvalidCursorError(fmt.Errorf("decode cursor: %w", err))
 		}
 		input.ExclusiveStartKey = exclusiveStartKey
 	}
@@ -267,12 +268,12 @@ func (d *DynamoDB) QueryItemsWithPagination(ctx context.Context, table string, k
 		return "", fmt.Errorf("unmarshal query results: %w", err)
 	}
 
-	encodedNextToken, err := encodePaginationToken(result.LastEvaluatedKey)
+	nextCursor, err := encodeCursor(result.LastEvaluatedKey)
 	if err != nil {
-		return "", fmt.Errorf("encode pagination token: %w", err)
+		return "", fmt.Errorf("encode cursor: %w", err)
 	}
 
-	return encodedNextToken, nil
+	return nextCursor, nil
 }
 
 // ScanItems runs a DynamoDB Scan operation and unmarshals the matching items into out.
@@ -447,7 +448,7 @@ func localDynamoDBEndpoint() (string, bool) {
 	return endpoint, true
 }
 
-func encodePaginationToken(lastEvaluatedKey map[string]types.AttributeValue) (string, error) {
+func encodeCursor(lastEvaluatedKey map[string]types.AttributeValue) (string, error) {
 	if len(lastEvaluatedKey) == 0 {
 		return "", nil
 	}
@@ -465,20 +466,20 @@ func encodePaginationToken(lastEvaluatedKey map[string]types.AttributeValue) (st
 	return base64.StdEncoding.EncodeToString(jsonBytes), nil
 }
 
-func decodePaginationToken(nextToken string) (map[string]types.AttributeValue, error) {
-	jsonBytes, err := base64.StdEncoding.DecodeString(nextToken)
+func decodeCursor(cursor string) (map[string]types.AttributeValue, error) {
+	jsonBytes, err := base64.StdEncoding.DecodeString(cursor)
 	if err != nil {
-		return nil, fmt.Errorf("base64 decode token: %w", err)
+		return nil, fmt.Errorf("base64 decode cursor: %w", err)
 	}
 
 	decoded := map[string]any{}
 	if err := json.Unmarshal(jsonBytes, &decoded); err != nil {
-		return nil, fmt.Errorf("unmarshal token payload: %w", err)
+		return nil, fmt.Errorf("unmarshal cursor payload: %w", err)
 	}
 
 	lastEvaluatedKey, err := attributevalue.MarshalMap(decoded)
 	if err != nil {
-		return nil, fmt.Errorf("marshal token key: %w", err)
+		return nil, fmt.Errorf("marshal cursor key: %w", err)
 	}
 
 	return lastEvaluatedKey, nil

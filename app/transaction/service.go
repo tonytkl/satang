@@ -15,9 +15,9 @@ type Service interface {
 	// PrepareCreateTransaction validates and builds a write op for the transaction, without persisting.
 	PrepareCreateTransaction(walletID string, walletName string, categoryID string, categoryName string, description string, currency string, imageURL string, txType string, amount float64, date time.Time, ownerID string) (clients.WriteOp, error)
 	GetTransaction(ctx context.Context, transactionID string, ownerID string) (*Transaction, error)
-	ListTransactions(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, nextToken string) ([]Transaction, string, error)
-	ListTransactionsOfCategory(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, nextToken string, categoryID string) ([]Transaction, string, error)
-	ListTransactionsOfWallet(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, nextToken string, wallet string) ([]Transaction, string, error)
+	ListTransactions(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, cursor string) ([]Transaction, string, error)
+	ListTransactionsOfCategory(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, cursor string, categoryID string) ([]Transaction, string, error)
+	ListTransactionsOfWallet(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, cursor string, wallet string) ([]Transaction, string, error)
 	EditTransaction(ctx context.Context, ownerID string, transactionID string, changedFields map[string]any) error
 	DeleteTransaction(ctx context.Context, ownerID string, transactionID string) error
 }
@@ -51,7 +51,7 @@ func (service *transactionService) PrepareCreateTransaction(walletID string, wal
 func buildTransaction(walletID string, walletName string, categoryID string, categoryName string, description string, currency string, imageURL string, txType string, amount float64, date time.Time, ownerID string) (*Transaction, error) {
 	transactionType, err := getTransactionType(txType)
 	if err != nil {
-		return nil, err
+		return nil, utils.ValidationError(err)
 	}
 	transaction := NewTransaction(
 		walletID,
@@ -67,7 +67,7 @@ func buildTransaction(walletID string, walletName string, categoryID string, cat
 		ownerID,
 	)
 	if err := validateTransaction(transaction); err != nil {
-		return nil, err
+		return nil, utils.ValidationError(err)
 	}
 	return transaction, nil
 }
@@ -84,7 +84,7 @@ func (service *transactionService) GetTransaction(ctx context.Context, transacti
 	return service.repository.GetTransaction(ctx, ownerID, transactionID)
 }
 
-func (service *transactionService) ListTransactions(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, nextToken string) ([]Transaction, string, error) {
+func (service *transactionService) ListTransactions(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, cursor string) ([]Transaction, string, error) {
 	if ownerID == "" {
 		return nil, "", errors.New("owner ID is required")
 	}
@@ -101,10 +101,10 @@ func (service *transactionService) ListTransactions(ctx context.Context, ownerID
 		fromDate = fromDate.UTC()
 	}
 	if fromDate.After(toDate) {
-		return nil, "", errors.New("from date must not be after to date")
+		return nil, "", utils.ValidationError(errors.New("from date must not be after to date"))
 	}
 	if limit < 0 {
-		return nil, "", errors.New("limit must be greater than or equal to 0")
+		return nil, "", utils.ValidationError(errors.New("limit must be greater than or equal to 0"))
 	}
 
 	// Default pagination size if not set
@@ -112,10 +112,10 @@ func (service *transactionService) ListTransactions(ctx context.Context, ownerID
 		limit = utils.DEFAULT_PAGINATION_SIZE
 	}
 
-	return service.repository.ListTransactionsOfSubModel(ctx, "date", "", ownerID, fromDate, toDate, nextToken, limit)
+	return service.repository.ListTransactionsOfSubModel(ctx, "date", "", ownerID, fromDate, toDate, cursor, limit)
 }
 
-func (service *transactionService) ListTransactionsOfCategory(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, nextToken string, categoryID string) ([]Transaction, string, error) {
+func (service *transactionService) ListTransactionsOfCategory(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, cursor string, categoryID string) ([]Transaction, string, error) {
 	if ownerID == "" {
 		return nil, "", errors.New("owner ID is required")
 	}
@@ -144,10 +144,10 @@ func (service *transactionService) ListTransactionsOfCategory(ctx context.Contex
 		limit = utils.DEFAULT_PAGINATION_SIZE
 	}
 
-	return service.repository.ListTransactionsOfSubModel(ctx, "category", categoryID, ownerID, fromDate, toDate, nextToken, limit)
+	return service.repository.ListTransactionsOfSubModel(ctx, "category", categoryID, ownerID, fromDate, toDate, cursor, limit)
 }
 
-func (service *transactionService) ListTransactionsOfWallet(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, nextToken string, walletID string) ([]Transaction, string, error) {
+func (service *transactionService) ListTransactionsOfWallet(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, cursor string, walletID string) ([]Transaction, string, error) {
 	if ownerID == "" {
 		return nil, "", errors.New("owner ID is required")
 	}
@@ -176,7 +176,7 @@ func (service *transactionService) ListTransactionsOfWallet(ctx context.Context,
 		limit = utils.DEFAULT_PAGINATION_SIZE
 	}
 
-	return service.repository.ListTransactionsOfSubModel(ctx, "wallet", walletID, ownerID, fromDate, toDate, nextToken, limit)
+	return service.repository.ListTransactionsOfSubModel(ctx, "wallet", walletID, ownerID, fromDate, toDate, cursor, limit)
 }
 
 func (service *transactionService) EditTransaction(ctx context.Context, ownerID string, transactionID string, changedFields map[string]any) error {

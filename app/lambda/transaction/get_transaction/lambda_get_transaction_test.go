@@ -26,19 +26,19 @@ func (m *mockTransactionService) CreateTransaction(ctx context.Context, walletID
 	return nil
 }
 
-func (m *mockTransactionService) GetTransactionsBetweenPeriod(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, nextToken string) ([]transaction.Transaction, string, error) {
+func (m *mockTransactionService) GetTransactionsBetweenPeriod(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, cursor string) ([]transaction.Transaction, string, error) {
 	return nil, "", nil
 }
 
-func (m *mockTransactionService) ListTransactions(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, nextToken string) ([]transaction.Transaction, string, error) {
+func (m *mockTransactionService) ListTransactions(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, cursor string) ([]transaction.Transaction, string, error) {
 	return nil, "", nil
 }
 
-func (m *mockTransactionService) ListTransactionsOfCategory(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, nextToken string, categoryID string) ([]transaction.Transaction, string, error) {
+func (m *mockTransactionService) ListTransactionsOfCategory(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, cursor string, categoryID string) ([]transaction.Transaction, string, error) {
 	return nil, "", nil
 }
 
-func (m *mockTransactionService) ListTransactionsOfWallet(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, nextToken string, wallet string) ([]transaction.Transaction, string, error) {
+func (m *mockTransactionService) ListTransactionsOfWallet(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, cursor string, wallet string) ([]transaction.Transaction, string, error) {
 	return nil, "", nil
 }
 
@@ -118,8 +118,19 @@ func TestGetTransactionLambda_Handle(t *testing.T) {
 					return nil, errors.New("db error")
 				},
 			},
-			wantStatusCode: 400,
+			wantStatusCode: 500,
 			wantBody:       "db error",
+		},
+		{
+			name:          "service deadline",
+			transactionID: "timeout",
+			service: &mockTransactionService{
+				getTransactionFunc: func(context.Context, string) (*transaction.Transaction, error) {
+					return nil, context.DeadlineExceeded
+				},
+			},
+			wantStatusCode: 504,
+			wantBody:       context.DeadlineExceeded.Error(),
 		},
 		{
 			name:          "missing transaction_id",

@@ -32,7 +32,7 @@ func (m *MockWalletService) PrepareCreateWallet(ownerID string, name string, cur
 	return wallet.Wallet{}, clients.WriteOp{Table: "wallet"}, nil
 }
 
-func (m *MockWalletService) ListWallets(ctx context.Context, ownerID string, nextToken string, limit int32) ([]wallet.Wallet, string, error) {
+func (m *MockWalletService) ListWallets(ctx context.Context, ownerID string, cursor string, limit int32) ([]wallet.Wallet, string, error) {
 	return nil, "", nil
 }
 
@@ -145,7 +145,7 @@ func TestHandle_MissingWalletType(t *testing.T) {
 	assert.Equal(t, "type is required", errResp.Message)
 }
 
-func TestHandle_ServiceErrorReturnsBadRequest(t *testing.T) {
+func TestHandle_ServiceErrorReturnsInternalServerError(t *testing.T) {
 	payload := createWalletRequest{
 		Name:       "Main Wallet",
 		Currency:   "USD",
@@ -167,7 +167,7 @@ func TestHandle_ServiceErrorReturnsBadRequest(t *testing.T) {
 	response, err := handler.Handle(context.Background(), events.APIGatewayV2HTTPRequest{Body: string(body)})
 
 	require.NoError(t, err)
-	assert.Equal(t, http.StatusBadRequest, response.StatusCode)
+	assert.Equal(t, http.StatusInternalServerError, response.StatusCode)
 
 	var errResp errorResponse
 	err = json.Unmarshal([]byte(response.Body), &errResp)
@@ -248,7 +248,7 @@ func TestHandle_TransactionPrepareErrorWritesNothing(t *testing.T) {
 	response, err := newHandler(&MockWalletService{}, transactionService, writer).Handle(context.Background(), events.APIGatewayV2HTTPRequest{Body: string(body)})
 
 	require.NoError(t, err)
-	assert.Equal(t, http.StatusBadRequest, response.StatusCode)
+	assert.Equal(t, http.StatusInternalServerError, response.StatusCode)
 	assert.Nil(t, writer.ops)
 }
 
@@ -261,6 +261,38 @@ func TestHandle_CommitErrorReturnsInternalServerError(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusInternalServerError, response.StatusCode)
+}
+
+func TestHandle_RetryableErrors(t *testing.T) {
+	tests := []struct {
+		name      string
+		walletErr error
+		txErr     error
+		writeErr  error
+	}{
+		{name: "wallet preparation", walletErr: context.DeadlineExceeded},
+		{name: "transaction preparation", txErr: context.DeadlineExceeded},
+		{name: "transaction write", writeErr: context.DeadlineExceeded},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			walletService := &MockWalletService{PrepareCreateWalletFunc: func(string, string, string, float64, string) (wallet.Wallet, clients.WriteOp, error) {
+				return wallet.Wallet{}, clients.WriteOp{}, tt.walletErr
+			}}
+			txService := &MockTransactionService{PrepareCreateTransactionFunc: func(string, string, string, string, string, string, string, string, float64, time.Time, string) (clients.WriteOp, error) {
+				return clients.WriteOp{}, tt.txErr
+			}}
+			response, err := newHandler(walletService, txService, &MockWriter{err: tt.writeErr}).Handle(context.Background(), events.APIGatewayV2HTTPRequest{Body: `{"name":"Main","walletType":"debit","balance":1}`})
+			require.NoError(t, err)
+			assert.Equal(t, http.StatusGatewayTimeout, response.StatusCode)
+		})
+	}
+}
+
+func TestHandle_InvalidWalletType(t *testing.T) {
+	response, err := newHandler(wallet.NewService(nil), &MockTransactionService{}, &MockWriter{}).Handle(context.Background(), events.APIGatewayV2HTTPRequest{Body: `{"walletType":"invalid"}`})
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusBadRequest, response.StatusCode)
 }
 
 func TestValidatePayload_EmptyWalletType(t *testing.T) {

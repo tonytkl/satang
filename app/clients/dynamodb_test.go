@@ -12,6 +12,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/tonytkl/satang/utils"
 )
 
 type testTransaction struct {
@@ -255,7 +256,7 @@ func TestDynamoDBQueryItemsWithIndex(t *testing.T) {
 }
 
 func TestDynamoDBQueryItemsWithPagination(t *testing.T) {
-	nextToken, err := encodePaginationToken(map[string]types.AttributeValue{
+	cursor, err := encodeCursor(map[string]types.AttributeValue{
 		"PK": &types.AttributeValueMemberS{Value: "USER#user-1"},
 		"SK": &types.AttributeValueMemberS{Value: "TX#2026-04-01#tx-1"},
 	})
@@ -286,7 +287,7 @@ func TestDynamoDBQueryItemsWithPagination(t *testing.T) {
 	})
 
 	var got []testTransaction
-	returnedToken, err := client.QueryItemsWithPagination(
+	returnedCursor, err := client.QueryItemsWithPagination(
 		context.Background(),
 		"transactions",
 		"user_id = :user_id",
@@ -294,16 +295,16 @@ func TestDynamoDBQueryItemsWithPagination(t *testing.T) {
 		"",
 		"",
 		10,
-		nextToken,
+		cursor,
 		&got,
 	)
 	require.NoError(t, err)
 	require.Len(t, got, 1)
 	assert.Equal(t, testTransaction{ID: "txn-3", UserID: "user-1", Amount: 200}, got[0])
-	assert.NotEmpty(t, returnedToken)
+	assert.NotEmpty(t, returnedCursor)
 }
 
-func TestDynamoDBQueryItemsWithPaginationInvalidToken(t *testing.T) {
+func TestDynamoDBQueryItemsWithPaginationInvalidCursor(t *testing.T) {
 	client := newTestClient(t, func(t *testing.T, writer http.ResponseWriter, request *http.Request, payload map[string]any) {
 		writeJSON(t, writer, map[string]any{})
 	})
@@ -317,11 +318,12 @@ func TestDynamoDBQueryItemsWithPaginationInvalidToken(t *testing.T) {
 		"",
 		"",
 		10,
-		"not-base64",
+		"random",
 		&got,
 	)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "decode pagination token")
+	assert.Contains(t, err.Error(), "decode cursor")
+	assert.Equal(t, http.StatusBadRequest, utils.ErrorStatusCode(err))
 }
 
 func TestDynamoDBScanItems(t *testing.T) {

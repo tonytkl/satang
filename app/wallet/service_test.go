@@ -12,7 +12,7 @@ import (
 
 type mockWalletRepository struct {
 	createWalletFn func(ctx context.Context, wallet Wallet) error
-	listWalletsFn  func(ctx context.Context, ownerID string, nextToken string, limit int32) ([]Wallet, string, error)
+	listWalletsFn  func(ctx context.Context, ownerID string, cursor string, limit int32) ([]Wallet, string, error)
 	getWalletFn    func(ctx context.Context, ownerID string, walletID string) (Wallet, error)
 	editWalletFn   func(ctx context.Context, ownerID string, walletID string, changedFields map[string]any) (Wallet, error)
 	deleteWalletFn func(ctx context.Context, ownerID string, walletID string) error
@@ -27,9 +27,9 @@ func (m *mockWalletRepository) CreateWallet(ctx context.Context, wallet Wallet) 
 	return nil
 }
 
-func (m *mockWalletRepository) ListWallets(ctx context.Context, ownerID string, nextToken string, limit int32) ([]Wallet, string, error) {
+func (m *mockWalletRepository) ListWallets(ctx context.Context, ownerID string, cursor string, limit int32) ([]Wallet, string, error) {
 	if m.listWalletsFn != nil {
-		return m.listWalletsFn(ctx, ownerID, nextToken, limit)
+		return m.listWalletsFn(ctx, ownerID, cursor, limit)
 	}
 	return nil, "", nil
 }
@@ -105,7 +105,7 @@ func TestCreateWalletRejectsEmptyOwnerID(t *testing.T) {
 func TestListWalletsRejectsNegativeLimit(t *testing.T) {
 	repoCalled := false
 	repo := &mockWalletRepository{
-		listWalletsFn: func(ctx context.Context, ownerID string, nextToken string, limit int32) ([]Wallet, string, error) {
+		listWalletsFn: func(ctx context.Context, ownerID string, cursor string, limit int32) ([]Wallet, string, error) {
 			repoCalled = true
 			return []Wallet{}, "", nil
 		},

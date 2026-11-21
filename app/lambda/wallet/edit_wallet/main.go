@@ -80,7 +80,7 @@ func (handler *editWalletLambda) Handle(ctx context.Context, request events.APIG
 		if errors.Is(err, wallet.ErrWalletNotFound) {
 			return utils.JsonResponse(http.StatusNotFound, errorResponse{Message: "Wallet not found"})
 		}
-		return utils.JsonResponse(http.StatusBadRequest, errorResponse{Message: err.Error()})
+		return utils.JsonResponse(utils.ErrorStatusCode(err), errorResponse{Message: err.Error()})
 	}
 
 	walletResponse := wallet.BuildWalletRead(editdWallet)

@@ -12,20 +12,32 @@ import (
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/tonytkl/satang/utils"
 	"github.com/tonytkl/satang/wallet"
 )
 
 type mockWalletService struct {
-	listWalletsFunc func(ctx context.Context, ownerID string, nextToken string, limit int32) ([]wallet.Wallet, string, error)
+	listWalletsFunc func(ctx context.Context, ownerID string, cursor string, limit int32) ([]wallet.Wallet, string, error)
+}
+
+func TestListWalletsLambdaHandleServiceDeadline(t *testing.T) {
+	handler := &listWalletsLambda{service: &mockWalletService{
+		listWalletsFunc: func(context.Context, string, string, int32) ([]wallet.Wallet, string, error) {
+			return nil, "", context.DeadlineExceeded
+		},
+	}}
+	response, err := handler.Handle(context.Background(), events.APIGatewayV2HTTPRequest{})
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusGatewayTimeout, response.StatusCode)
 }
 
 func (m *mockWalletService) CreateWallet(ctx context.Context, ownerID string, name string, currency string, balance float64, walletType string) (wallet.Wallet, error) {
 	return wallet.Wallet{}, nil
 }
 
-func (m *mockWalletService) ListWallets(ctx context.Context, ownerID string, nextToken string, limit int32) ([]wallet.Wallet, string, error) {
+func (m *mockWalletService) ListWallets(ctx context.Context, ownerID string, cursor string, limit int32) ([]wallet.Wallet, string, error) {
 	if m.listWalletsFunc != nil {
-		return m.listWalletsFunc(ctx, ownerID, nextToken, limit)
+		return m.listWalletsFunc(ctx, ownerID, cursor, limit)
 	}
 	return nil, "", nil
 }
@@ -43,15 +55,15 @@ func (m *mockWalletService) SetActiveWallet(ctx context.Context, ownerID string,
 }
 
 func TestListWalletsLambdaHandleSuccess(t *testing.T) {
-	expectedNextToken := "next-token-1"
+	expectedNextCursor := "next-token-1"
 	createdAt := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
 	updatedAt := time.Date(2026, 1, 3, 4, 5, 6, 0, time.UTC)
 
 	handler := &listWalletsLambda{
 		service: &mockWalletService{
-			listWalletsFunc: func(ctx context.Context, ownerID string, nextToken string, limit int32) ([]wallet.Wallet, string, error) {
+			listWalletsFunc: func(ctx context.Context, ownerID string, cursor string, limit int32) ([]wallet.Wallet, string, error) {
 				assert.Equal(t, "1", ownerID)
-				assert.Equal(t, expectedNextToken, nextToken)
+				assert.Equal(t, expectedNextCursor, cursor)
 				assert.Equal(t, int32(10), limit)
 
 				return []wallet.Wallet{{
@@ -69,8 +81,8 @@ func TestListWalletsLambdaHandleSuccess(t *testing.T) {
 
 	request := events.APIGatewayV2HTTPRequest{
 		QueryStringParameters: map[string]string{
-			"nextToken": expectedNextToken,
-			"limit":     "10",
+			"cursor": expectedNextCursor,
+			"limit":  "10",
 		},
 	}
 
@@ -90,7 +102,7 @@ func TestListWalletsLambdaHandleSuccess(t *testing.T) {
 	assert.Equal(t, "1", payload.Wallets[0].OwnerID)
 	assert.True(t, createdAt.Equal(payload.Wallets[0].CreatedAt))
 	assert.True(t, updatedAt.Equal(payload.Wallets[0].UpdatedAt))
-	assert.Equal(t, "next-token-2", payload.NextToken)
+	assert.Equal(t, "next-token-2", payload.NextCursor)
 }
 
 func TestListWalletsLambdaHandleInvalidLimit(t *testing.T) {
@@ -137,7 +149,7 @@ func TestListWalletsLambdaHandleNegativeLimit(t *testing.T) {
 func TestListWalletsLambdaHandleServiceError(t *testing.T) {
 	handler := &listWalletsLambda{
 		service: &mockWalletService{
-			listWalletsFunc: func(ctx context.Context, ownerID string, nextToken string, limit int32) ([]wallet.Wallet, string, error) {
+			listWalletsFunc: func(ctx context.Context, ownerID string, cursor string, limit int32) ([]wallet.Wallet, string, error) {
 				return nil, "", errors.New("database unavailable")
 			},
 		},
@@ -152,6 +164,27 @@ func TestListWalletsLambdaHandleServiceError(t *testing.T) {
 	err = json.Unmarshal([]byte(response.Body), &payload)
 	require.NoError(t, err)
 	assert.Equal(t, "database unavailable", payload.Message)
+}
+
+func TestListWalletsLambdaHandleInvalidCursor(t *testing.T) {
+	handler := &listWalletsLambda{
+		service: &mockWalletService{
+			listWalletsFunc: func(_ context.Context, _ string, cursor string, _ int32) ([]wallet.Wallet, string, error) {
+				assert.Equal(t, "random", cursor)
+				return nil, "", utils.InvalidCursorError(errors.New("decode cursor failed"))
+			},
+		},
+	}
+
+	response, err := handler.Handle(context.Background(), events.APIGatewayV2HTTPRequest{
+		QueryStringParameters: map[string]string{"cursor": "random"},
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusBadRequest, response.StatusCode)
+	var payload errorResponse
+	require.NoError(t, json.Unmarshal([]byte(response.Body), &payload))
+	assert.Equal(t, "Invalid cursor", payload.Message)
 }
 
 var _ wallet.Service = (*mockWalletService)(nil)

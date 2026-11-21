@@ -12,7 +12,7 @@ var ErrWalletNotFound = errors.New("wallet not found")
 
 type Repository interface {
 	CreateWallet(ctx context.Context, wallet Wallet) error
-	ListWallets(ctx context.Context, ownerID string, nextToken string, limit int32) ([]Wallet, string, error)
+	ListWallets(ctx context.Context, ownerID string, cursor string, limit int32) ([]Wallet, string, error)
 	GetWallet(ctx context.Context, ownerID string, walletID string) (Wallet, error)
 	EditWallet(ctx context.Context, ownerID string, walletID string, changedFields map[string]any) (Wallet, error)
 	DeleteWallet(ctx context.Context, ownerID string, walletID string) error
@@ -41,8 +41,8 @@ func (walletRepository *walletRepository) PrepareCreateWallet(wallet *Wallet) cl
 	return walletRepository.baseRepository.PrepareSave(wallet)
 }
 
-func (walletRepository *walletRepository) ListWallets(ctx context.Context, ownerID string, nextToken string, limit int32) ([]Wallet, string, error) {
-	items, encodedNextToken, err := walletRepository.baseRepository.List(ctx, ownerID, nextToken, limit)
+func (walletRepository *walletRepository) ListWallets(ctx context.Context, ownerID string, cursor string, limit int32) ([]Wallet, string, error) {
+	items, encodedNextCursor, err := walletRepository.baseRepository.List(ctx, ownerID, cursor, limit)
 	if err != nil {
 		return nil, "", err
 	}
@@ -55,7 +55,7 @@ func (walletRepository *walletRepository) ListWallets(ctx context.Context, owner
 		wallets = append(wallets, *item)
 	}
 
-	return wallets, encodedNextToken, nil
+	return wallets, encodedNextCursor, nil
 }
 
 func (walletRepository *walletRepository) GetWallet(ctx context.Context, ownerID string, walletID string) (Wallet, error) {

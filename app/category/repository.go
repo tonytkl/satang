@@ -12,9 +12,9 @@ var ErrCategoryNotFound = errors.New("Category not found")
 
 type Repository interface {
 	CreateCategory(ctx context.Context, category Category) error
-	ListCategories(ctx context.Context, ownerID string, nextToken string, limit int32) ([]Category, string, error)
+	ListCategories(ctx context.Context, ownerID string, cursor string, limit int32) ([]Category, string, error)
 	GetCategory(ctx context.Context, ownerID string, categoryID string) (Category, error)
-	EditCategory(ctx context.Context, ownerID string, categoryID string, changedFields map[string]any) error
+	EditCategory(ctx context.Context, ownerID string, categoryID string, changedFields map[string]any) (Category, error)
 	DeleteCategory(ctx context.Context, ownerID string, categoryID string) error
 }
 
@@ -36,8 +36,8 @@ func (categoryRepository *categoryRepository) CreateCategory(ctx context.Context
 	return categoryRepository.baseRepository.Save(ctx, &category)
 }
 
-func (categoryRepository *categoryRepository) ListCategories(ctx context.Context, ownerID string, nextToken string, limit int32) ([]Category, string, error) {
-	items, encodedNextToken, err := categoryRepository.baseRepository.List(ctx, ownerID, nextToken, limit)
+func (categoryRepository *categoryRepository) ListCategories(ctx context.Context, ownerID string, cursor string, limit int32) ([]Category, string, error) {
+	items, encodedNextCursor, err := categoryRepository.baseRepository.List(ctx, ownerID, cursor, limit)
 	if err != nil {
 		return nil, "", err
 	}
@@ -50,7 +50,7 @@ func (categoryRepository *categoryRepository) ListCategories(ctx context.Context
 		categories = append(categories, *item)
 	}
 
-	return categories, encodedNextToken, nil
+	return categories, encodedNextCursor, nil
 }
 
 func (categoryRepository *categoryRepository) GetCategory(ctx context.Context, ownerID string, categoryID string) (Category, error) {
@@ -67,9 +67,15 @@ func (categoryRepository *categoryRepository) GetCategory(ctx context.Context, o
 	return *category, nil
 }
 
-func (categoryRepository *categoryRepository) EditCategory(ctx context.Context, ownerID string, categoryID string, changedFields map[string]any) error {
-	_, err := categoryRepository.baseRepository.Update(ctx, ownerID, categoryID, changedFields)
-	return err
+func (categoryRepository *categoryRepository) EditCategory(ctx context.Context, ownerID string, categoryID string, changedFields map[string]any) (Category, error) {
+	category, err := categoryRepository.baseRepository.Update(ctx, ownerID, categoryID, changedFields)
+	if err != nil {
+		if errors.Is(err, clients.ErrItemNotFound) {
+			return Category{}, ErrCategoryNotFound
+		}
+		return Category{}, err
+	}
+	return *category, nil
 }
 
 func (categoryRepository *categoryRepository) DeleteCategory(ctx context.Context, ownerID string, categoryID string) error {

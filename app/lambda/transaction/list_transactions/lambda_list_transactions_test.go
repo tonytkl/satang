@@ -13,10 +13,34 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/tonytkl/satang/transaction"
+	"github.com/tonytkl/satang/utils"
 )
 
 type mockTransactionService struct {
-	getTransactionsBetweenPeriodFunc func(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, nextToken string) ([]transaction.Transaction, string, error)
+	getTransactionsBetweenPeriodFunc func(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, cursor string) ([]transaction.Transaction, string, error)
+}
+
+func TestListTransactionsLambdaHandleServiceDeadline(t *testing.T) {
+	handler := &listTransactionsLambda{service: &mockTransactionService{
+		getTransactionsBetweenPeriodFunc: func(context.Context, string, time.Time, time.Time, int32, string) ([]transaction.Transaction, string, error) {
+			return nil, "", context.DeadlineExceeded
+		},
+	}}
+	response, err := handler.Handle(context.Background(), events.APIGatewayV2HTTPRequest{})
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusGatewayTimeout, response.StatusCode)
+}
+
+func TestListTransactionsLambdaHandleInvalidRangeAndLimit(t *testing.T) {
+	handler := &listTransactionsLambda{service: transaction.NewService(nil)}
+	for _, query := range []map[string]string{
+		{"fromDate": "2025-06-01", "toDate": "2025-05-01"},
+		{"limit": "-1"},
+	} {
+		response, err := handler.Handle(context.Background(), events.APIGatewayV2HTTPRequest{QueryStringParameters: query})
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusBadRequest, response.StatusCode)
+	}
 }
 
 func (m *mockTransactionService) CreateTransaction(ctx context.Context, walletID, walletName, categoryID, categoryName, description, currency, imageURL, txType string, amount float64, date time.Time, ownerID string) error {
@@ -27,25 +51,25 @@ func (m *mockTransactionService) GetTransaction(ctx context.Context, transaction
 	return nil, nil
 }
 
-func (m *mockTransactionService) GetTransactionsBetweenPeriod(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, nextToken string) ([]transaction.Transaction, string, error) {
+func (m *mockTransactionService) GetTransactionsBetweenPeriod(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, cursor string) ([]transaction.Transaction, string, error) {
 	if m.getTransactionsBetweenPeriodFunc != nil {
-		return m.getTransactionsBetweenPeriodFunc(ctx, ownerID, fromDate, toDate, limit, nextToken)
+		return m.getTransactionsBetweenPeriodFunc(ctx, ownerID, fromDate, toDate, limit, cursor)
 	}
 	return nil, "", nil
 }
 
-func (m *mockTransactionService) ListTransactions(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, nextToken string) ([]transaction.Transaction, string, error) {
+func (m *mockTransactionService) ListTransactions(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, cursor string) ([]transaction.Transaction, string, error) {
 	if m.getTransactionsBetweenPeriodFunc != nil {
-		return m.getTransactionsBetweenPeriodFunc(ctx, ownerID, fromDate, toDate, limit, nextToken)
+		return m.getTransactionsBetweenPeriodFunc(ctx, ownerID, fromDate, toDate, limit, cursor)
 	}
 	return nil, "", nil
 }
 
-func (m *mockTransactionService) ListTransactionsOfCategory(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, nextToken string, categoryID string) ([]transaction.Transaction, string, error) {
+func (m *mockTransactionService) ListTransactionsOfCategory(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, cursor string, categoryID string) ([]transaction.Transaction, string, error) {
 	return nil, "", nil
 }
 
-func (m *mockTransactionService) ListTransactionsOfWallet(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, nextToken string, wallet string) ([]transaction.Transaction, string, error) {
+func (m *mockTransactionService) ListTransactionsOfWallet(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, cursor string, wallet string) ([]transaction.Transaction, string, error) {
 	return nil, "", nil
 }
 
@@ -61,16 +85,16 @@ func TestListTransactionsLambdaHandleSuccess(t *testing.T) {
 	expectedFromDate := time.Date(2025, 5, 1, 0, 0, 0, 0, time.UTC)
 	expectedToDate := time.Date(2025, 5, 31, 0, 0, 0, 0, time.UTC)
 	expectedLimit := int32(10)
-	expectedNextToken := "next-token-1"
+	expectedNextCursor := "next-token-1"
 
 	handler := &listTransactionsLambda{
 		service: &mockTransactionService{
-			getTransactionsBetweenPeriodFunc: func(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, nextToken string) ([]transaction.Transaction, string, error) {
+			getTransactionsBetweenPeriodFunc: func(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, cursor string) ([]transaction.Transaction, string, error) {
 				assert.Equal(t, "1", ownerID)
 				assert.True(t, expectedFromDate.Equal(fromDate))
 				assert.True(t, expectedToDate.Equal(toDate))
 				assert.Equal(t, expectedLimit, limit)
-				assert.Equal(t, expectedNextToken, nextToken)
+				assert.Equal(t, expectedNextCursor, cursor)
 
 				return []transaction.Transaction{{
 					ID:           "tx-1",
@@ -90,10 +114,10 @@ func TestListTransactionsLambdaHandleSuccess(t *testing.T) {
 
 	request := events.APIGatewayV2HTTPRequest{
 		QueryStringParameters: map[string]string{
-			"fromDate":  "2025-05-01",
-			"toDate":    "2025-05-31",
-			"limit":     "10",
-			"nextToken": expectedNextToken,
+			"fromDate": "2025-05-01",
+			"toDate":   "2025-05-31",
+			"limit":    "10",
+			"cursor":   expectedNextCursor,
 		},
 	}
 
@@ -109,7 +133,7 @@ func TestListTransactionsLambdaHandleSuccess(t *testing.T) {
 	assert.Equal(t, "tx-1", payload.Transactions[0].ID)
 	assert.Equal(t, "wallet-1", payload.Transactions[0].WalletID)
 	assert.Equal(t, transaction.TransactionTypeExpense, payload.Transactions[0].Type)
-	assert.Equal(t, "next-token-2", payload.NextToken)
+	assert.Equal(t, "next-token-2", payload.NextCursor)
 }
 
 func TestListTransactionsLambdaHandleInvalidLimit(t *testing.T) {
@@ -147,7 +171,7 @@ func TestListTransactionsLambdaHandleInvalidFromDate(t *testing.T) {
 func TestListTransactionsLambdaHandleServiceError(t *testing.T) {
 	handler := &listTransactionsLambda{
 		service: &mockTransactionService{
-			getTransactionsBetweenPeriodFunc: func(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, nextToken string) ([]transaction.Transaction, string, error) {
+			getTransactionsBetweenPeriodFunc: func(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, cursor string) ([]transaction.Transaction, string, error) {
 				return nil, "", errors.New("database unavailable")
 			},
 		},
@@ -169,10 +193,31 @@ func TestListTransactionsLambdaHandleServiceError(t *testing.T) {
 	assert.Equal(t, "database unavailable", payload.Message)
 }
 
+func TestListTransactionsLambdaHandleInvalidCursor(t *testing.T) {
+	handler := &listTransactionsLambda{
+		service: &mockTransactionService{
+			getTransactionsBetweenPeriodFunc: func(_ context.Context, _ string, _ time.Time, _ time.Time, _ int32, cursor string) ([]transaction.Transaction, string, error) {
+				assert.Equal(t, "random", cursor)
+				return nil, "", utils.InvalidCursorError(errors.New("decode cursor failed"))
+			},
+		},
+	}
+
+	response, err := handler.Handle(context.Background(), events.APIGatewayV2HTTPRequest{
+		QueryStringParameters: map[string]string{"cursor": "random"},
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusBadRequest, response.StatusCode)
+	var payload errorResponse
+	require.NoError(t, json.Unmarshal([]byte(response.Body), &payload))
+	assert.Equal(t, "Invalid cursor", payload.Message)
+}
+
 func TestListTransactionsLambdaHandleInvalidTransactionSchema(t *testing.T) {
 	handler := &listTransactionsLambda{
 		service: &mockTransactionService{
-			getTransactionsBetweenPeriodFunc: func(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, nextToken string) ([]transaction.Transaction, string, error) {
+			getTransactionsBetweenPeriodFunc: func(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, cursor string) ([]transaction.Transaction, string, error) {
 				return []transaction.Transaction{{
 					ID:         "",
 					WalletID:   "wallet-1",

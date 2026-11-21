@@ -26,7 +26,7 @@ type listTransactionsLambda struct {
 
 type listTransactionsResponse struct {
 	Transactions []transaction.TransactionRead `json:"transactions"`
-	NextToken    string                        `json:"nextToken"`
+	NextCursor   string                        `json:"nextCursor"`
 }
 
 func main() {
@@ -58,7 +58,7 @@ func (handler *listTransactionsLambda) Handle(ctx context.Context, request event
 	toDateQuery := request.QueryStringParameters["toDate"]
 
 	// Pagination
-	nextTokenQuery := request.QueryStringParameters["nextToken"]
+	cursorQuery := request.QueryStringParameters["cursor"]
 	limitQuery := request.QueryStringParameters["limit"]
 
 	var limit int32
@@ -93,9 +93,9 @@ func (handler *listTransactionsLambda) Handle(ctx context.Context, request event
 			return utils.JsonResponse(http.StatusBadRequest, errorResponse{Message: err.Error()})
 		}
 	}
-	transactions, nextToken, err := handler.service.ListTransactions(ctx, ownerID, fromDate, toDate, limit, nextTokenQuery)
+	transactions, cursor, err := handler.service.ListTransactions(ctx, ownerID, fromDate, toDate, limit, cursorQuery)
 	if err != nil {
-		return utils.JsonResponse(http.StatusInternalServerError, errorResponse{Message: err.Error()})
+		return utils.JsonResponse(utils.ErrorStatusCode(err), errorResponse{Message: utils.ErrorMessage(err)})
 	}
 
 	responseTransactions, err := transaction.BuildTransactionRead(transactions)
@@ -105,7 +105,7 @@ func (handler *listTransactionsLambda) Handle(ctx context.Context, request event
 
 	response := listTransactionsResponse{
 		Transactions: responseTransactions,
-		NextToken:    nextToken,
+		NextCursor:   cursor,
 	}
 	return utils.JsonResponse(http.StatusOK, response)
 }

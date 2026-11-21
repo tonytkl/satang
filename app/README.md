@@ -98,6 +98,7 @@ Refer to each domain package for its specific key scheme.
 ### AWS Lambda (`lambda/`)
 - One `main.go` per operation, grouped by domain (`lambda/<domain>/<operation>/`).
 - Handles API Gateway request/response marshaling and error handling.
+- Invalid input returns 400, missing resources return 404, and unexpected errors return 500. Retryable upstream HTTP statuses are preserved; AWS throttling errors return 429 and AWS request-timeout errors return 408. Network and context deadlines return 504.
 
 ### Utilities (`utils/`)
 - `api_gateway_helper.go`, `date_helper.go`, `dynamodb_key_helper.go`, `constants.go`.

@@ -33,7 +33,26 @@ locals {
       artifact_path = "../../aws/lambda/edit_wallet.zip"
     }
   }
-  lambda_functions = merge(local.transaction_functions, local.wallet_functions)
+  category_functions = {
+      # Categories
+      create_category = {
+        function_name = "satang-create-category"
+        artifact_path = "../../aws/lambda/create_category.zip"
+      }
+      get_category = {
+        function_name = "satang-get-category"
+        artifact_path = "../../aws/lambda/get_category.zip"
+      }
+      list_categories = {
+        function_name = "satang-list-categories"
+        artifact_path = "../../aws/lambda/list_categories.zip"
+      }
+      edit_category = {
+        function_name = "satang-edit-category"
+        artifact_path = "../../aws/lambda/edit_category.zip"
+      }
+    }
+  lambda_functions = merge(local.transaction_functions, local.wallet_functions, local.category_functions)
 }
 
 module "lambdas" {

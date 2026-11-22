@@ -12,8 +12,8 @@ import (
 
 type Service interface {
 	CreateTransaction(ctx context.Context, walletID string, walletName string, categoryID string, categoryName string, description string, currency string, imageURL string, txType string, amount float64, date time.Time, ownerID string) error
-	// PrepareCreateTransaction validates and builds a write op for the transaction, without persisting.
-	PrepareCreateTransaction(walletID string, walletName string, categoryID string, categoryName string, description string, currency string, imageURL string, txType string, amount float64, date time.Time, ownerID string) (clients.WriteOp, error)
+	// PrepareCreateTransaction validates and builds a transaction and its write op, without persisting.
+	PrepareCreateTransaction(walletID string, walletName string, categoryID string, categoryName string, description string, currency string, imageURL string, txType string, amount float64, date time.Time, ownerID string) (Transaction, clients.WriteOp, error)
 	GetTransaction(ctx context.Context, transactionID string, ownerID string) (*Transaction, error)
 	ListTransactions(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, cursor string) ([]Transaction, string, error)
 	ListTransactionsOfCategory(ctx context.Context, ownerID string, fromDate time.Time, toDate time.Time, limit int32, cursor string, categoryID string) ([]Transaction, string, error)
@@ -40,12 +40,13 @@ func (service *transactionService) CreateTransaction(ctx context.Context, wallet
 	return service.repository.CreateTransaction(ctx, transaction)
 }
 
-func (service *transactionService) PrepareCreateTransaction(walletID string, walletName string, categoryID string, categoryName string, description string, currency string, imageURL string, txType string, amount float64, date time.Time, ownerID string) (clients.WriteOp, error) {
+func (service *transactionService) PrepareCreateTransaction(walletID string, walletName string, categoryID string, categoryName string, description string, currency string, imageURL string, txType string, amount float64, date time.Time, ownerID string) (Transaction, clients.WriteOp, error) {
 	transaction, err := buildTransaction(walletID, walletName, categoryID, categoryName, description, currency, imageURL, txType, amount, date, ownerID)
 	if err != nil {
-		return clients.WriteOp{}, err
+		return Transaction{}, clients.WriteOp{}, err
 	}
-	return service.repository.PrepareCreateTransaction(transaction), nil
+	op := service.repository.PrepareCreateTransaction(transaction)
+	return *transaction, op, nil
 }
 
 func buildTransaction(walletID string, walletName string, categoryID string, categoryName string, description string, currency string, imageURL string, txType string, amount float64, date time.Time, ownerID string) (*Transaction, error) {

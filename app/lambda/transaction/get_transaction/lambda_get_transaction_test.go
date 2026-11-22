@@ -166,6 +166,6 @@ func TestGetTransactionLambda_Handle(t *testing.T) {
 	}
 }
 
-func (m *mockTransactionService) PrepareCreateTransaction(walletID string, walletName string, categoryID string, categoryName string, description string, currency string, imageURL string, txType string, amount float64, date time.Time, ownerID string) (clients.WriteOp, error) {
-	return clients.WriteOp{}, nil
+func (m *mockTransactionService) PrepareCreateTransaction(walletID string, walletName string, categoryID string, categoryName string, description string, currency string, imageURL string, txType string, amount float64, date time.Time, ownerID string) (transaction.Transaction, clients.WriteOp, error) {
+	return transaction.Transaction{}, clients.WriteOp{}, nil
 }

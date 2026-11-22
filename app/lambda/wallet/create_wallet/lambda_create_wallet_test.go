@@ -50,14 +50,14 @@ func (m *MockWalletService) SetActiveWallet(ctx context.Context, ownerID string,
 
 type MockTransactionService struct {
 	transaction.Service
-	PrepareCreateTransactionFunc func(walletID string, walletName string, categoryID string, categoryName string, description string, currency string, imageURL string, txType string, amount float64, date time.Time, ownerID string) (clients.WriteOp, error)
+	PrepareCreateTransactionFunc func(walletID string, walletName string, categoryID string, categoryName string, description string, currency string, imageURL string, txType string, amount float64, date time.Time, ownerID string) (transaction.Transaction, clients.WriteOp, error)
 }
 
-func (m *MockTransactionService) PrepareCreateTransaction(walletID string, walletName string, categoryID string, categoryName string, description string, currency string, imageURL string, txType string, amount float64, date time.Time, ownerID string) (clients.WriteOp, error) {
+func (m *MockTransactionService) PrepareCreateTransaction(walletID string, walletName string, categoryID string, categoryName string, description string, currency string, imageURL string, txType string, amount float64, date time.Time, ownerID string) (transaction.Transaction, clients.WriteOp, error) {
 	if m.PrepareCreateTransactionFunc != nil {
 		return m.PrepareCreateTransactionFunc(walletID, walletName, categoryID, categoryName, description, currency, imageURL, txType, amount, date, ownerID)
 	}
-	return clients.WriteOp{Table: "transaction"}, nil
+	return transaction.Transaction{}, clients.WriteOp{Table: "transaction"}, nil
 }
 
 type MockWriter struct {
@@ -190,7 +190,7 @@ func TestHandle_NonZeroBalanceWritesWalletAndTransactionAtomically(t *testing.T)
 
 	calls := 0
 	transactionService := &MockTransactionService{
-		PrepareCreateTransactionFunc: func(walletID string, walletName string, categoryID string, categoryName string, description string, currency string, imageURL string, txType string, amount float64, date time.Time, ownerID string) (clients.WriteOp, error) {
+		PrepareCreateTransactionFunc: func(walletID string, walletName string, categoryID string, categoryName string, description string, currency string, imageURL string, txType string, amount float64, date time.Time, ownerID string) (transaction.Transaction, clients.WriteOp, error) {
 			calls++
 			assert.Equal(t, "wallet-1", walletID)
 			assert.Equal(t, "Main Wallet", walletName)
@@ -198,7 +198,7 @@ func TestHandle_NonZeroBalanceWritesWalletAndTransactionAtomically(t *testing.T)
 			assert.Equal(t, string(transaction.TransactionTypeIncome), txType)
 			assert.Equal(t, 250.0, amount)
 			assert.Equal(t, "1", ownerID)
-			return clients.WriteOp{Table: "transaction"}, nil
+			return transaction.Transaction{}, clients.WriteOp{Table: "transaction"}, nil
 		},
 	}
 
@@ -219,9 +219,9 @@ func TestHandle_ZeroBalanceWritesOnlyWallet(t *testing.T) {
 
 	calls := 0
 	transactionService := &MockTransactionService{
-		PrepareCreateTransactionFunc: func(walletID string, walletName string, categoryID string, categoryName string, description string, currency string, imageURL string, txType string, amount float64, date time.Time, ownerID string) (clients.WriteOp, error) {
+		PrepareCreateTransactionFunc: func(walletID string, walletName string, categoryID string, categoryName string, description string, currency string, imageURL string, txType string, amount float64, date time.Time, ownerID string) (transaction.Transaction, clients.WriteOp, error) {
 			calls++
-			return clients.WriteOp{}, nil
+			return transaction.Transaction{}, clients.WriteOp{}, nil
 		},
 	}
 
@@ -239,8 +239,8 @@ func TestHandle_TransactionPrepareErrorWritesNothing(t *testing.T) {
 	require.NoError(t, err)
 
 	transactionService := &MockTransactionService{
-		PrepareCreateTransactionFunc: func(walletID string, walletName string, categoryID string, categoryName string, description string, currency string, imageURL string, txType string, amount float64, date time.Time, ownerID string) (clients.WriteOp, error) {
-			return clients.WriteOp{}, assert.AnError
+		PrepareCreateTransactionFunc: func(walletID string, walletName string, categoryID string, categoryName string, description string, currency string, imageURL string, txType string, amount float64, date time.Time, ownerID string) (transaction.Transaction, clients.WriteOp, error) {
+			return transaction.Transaction{}, clients.WriteOp{}, assert.AnError
 		},
 	}
 
@@ -279,8 +279,8 @@ func TestHandle_RetryableErrors(t *testing.T) {
 			walletService := &MockWalletService{PrepareCreateWalletFunc: func(string, string, string, float64, string) (wallet.Wallet, clients.WriteOp, error) {
 				return wallet.Wallet{}, clients.WriteOp{}, tt.walletErr
 			}}
-			txService := &MockTransactionService{PrepareCreateTransactionFunc: func(string, string, string, string, string, string, string, string, float64, time.Time, string) (clients.WriteOp, error) {
-				return clients.WriteOp{}, tt.txErr
+			txService := &MockTransactionService{PrepareCreateTransactionFunc: func(string, string, string, string, string, string, string, string, float64, time.Time, string) (transaction.Transaction, clients.WriteOp, error) {
+				return transaction.Transaction{}, clients.WriteOp{}, tt.txErr
 			}}
 			response, err := newHandler(walletService, txService, &MockWriter{err: tt.writeErr}).Handle(context.Background(), events.APIGatewayV2HTTPRequest{Body: `{"name":"Main","walletType":"debit","balance":1}`})
 			require.NoError(t, err)

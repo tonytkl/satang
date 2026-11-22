@@ -4,21 +4,25 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"github.com/tonytkl/satang/clients"
 	"net/http"
 	"testing"
 	"time"
 
+	"github.com/tonytkl/satang/clients"
+
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/tonytkl/satang/category"
 	"github.com/tonytkl/satang/transaction"
+	"github.com/tonytkl/satang/wallet"
 )
 
 // MockTransactionService is a mock implementation of TransactionService
 type MockTransactionService struct {
-	CreateTransactionFunc func(ctx context.Context, walletID, walletName, categoryID, categoryName, description, currency, imageURL, transactionType string, amount float64, date time.Time, ownerID string) error
-	GetTransactionFunc    func(ctx context.Context, transactionID string) (*transaction.Transaction, error)
+	CreateTransactionFunc        func(ctx context.Context, walletID, walletName, categoryID, categoryName, description, currency, imageURL, transactionType string, amount float64, date time.Time, ownerID string) error
+	PrepareCreateTransactionFunc func(walletID, walletName, categoryID, categoryName, description, currency, imageURL, transactionType string, amount float64, date time.Time, ownerID string) (clients.WriteOp, error)
+	GetTransactionFunc           func(ctx context.Context, transactionID string) (*transaction.Transaction, error)
 }
 
 func (m *MockTransactionService) CreateTransaction(ctx context.Context, walletID, walletName, categoryID, categoryName, description, currency, imageURL, transactionType string, amount float64, date time.Time, ownerID string) error {
@@ -61,16 +65,14 @@ func (m *MockTransactionService) DeleteTransaction(ctx context.Context, ownerID 
 
 func TestHandle_ValidPayload(t *testing.T) {
 	payload := createTransactionRequest{
-		WalletID:     "wallet-123",
-		WalletName:   "Main Wallet",
-		CategoryID:   "cat-456",
-		CategoryName: "Food",
-		Description:  "Lunch",
-		Currency:     "USD",
-		ImageURL:     "https://example.com/image.jpg",
-		Type:         "expense",
-		Amount:       25.50,
-		Date:         "2025-05-17",
+		WalletID:    "wallet-123",
+		CategoryID:  "cat-456",
+		Description: "Lunch",
+		Currency:    "USD",
+		ImageURL:    "https://example.com/image.jpg",
+		Type:        "expense",
+		Amount:      25.50,
+		Date:        "2025-05-17",
 	}
 
 	body, err := json.Marshal(payload)
@@ -82,7 +84,7 @@ func TestHandle_ValidPayload(t *testing.T) {
 		},
 	}
 
-	handler := &createTransactionLambda{service: mockService}
+	handler := newMockTestHandler(mockService)
 	request := events.APIGatewayV2HTTPRequest{
 		Body: string(body),
 	}
@@ -95,7 +97,7 @@ func TestHandle_ValidPayload(t *testing.T) {
 
 func TestHandle_InvalidJSONPayload(t *testing.T) {
 	mockService := &MockTransactionService{}
-	handler := &createTransactionLambda{service: mockService}
+	handler := newMockTestHandler(mockService)
 	request := events.APIGatewayV2HTTPRequest{
 		Body: "invalid json",
 	}
@@ -113,21 +115,19 @@ func TestHandle_InvalidJSONPayload(t *testing.T) {
 
 func TestHandle_MissingWalletID(t *testing.T) {
 	payload := createTransactionRequest{
-		WalletID:     "", // missing
-		WalletName:   "Main Wallet",
-		CategoryID:   "cat-456",
-		CategoryName: "Food",
-		Currency:     "USD",
-		Type:         "expense",
-		Amount:       25.50,
-		Date:         "2025-05-17",
+		WalletID:   "", // missing
+		CategoryID: "cat-456",
+		Currency:   "USD",
+		Type:       "expense",
+		Amount:     25.50,
+		Date:       "2025-05-17",
 	}
 
 	body, err := json.Marshal(payload)
 	require.NoError(t, err)
 
 	mockService := &MockTransactionService{}
-	handler := &createTransactionLambda{service: mockService}
+	handler := newMockTestHandler(mockService)
 	request := events.APIGatewayV2HTTPRequest{
 		Body: string(body),
 	}
@@ -143,55 +143,21 @@ func TestHandle_MissingWalletID(t *testing.T) {
 	assert.Equal(t, "walletId is required", errResp.Message)
 }
 
-func TestHandle_MissingWalletName(t *testing.T) {
-	payload := createTransactionRequest{
-		WalletID:     "wallet-123",
-		WalletName:   "", // missing
-		CategoryID:   "cat-456",
-		CategoryName: "Food",
-		Currency:     "USD",
-		Type:         "expense",
-		Amount:       25.50,
-		Date:         "2025-05-17",
-	}
-
-	body, err := json.Marshal(payload)
-	require.NoError(t, err)
-
-	mockService := &MockTransactionService{}
-	handler := &createTransactionLambda{service: mockService}
-	request := events.APIGatewayV2HTTPRequest{
-		Body: string(body),
-	}
-
-	response, err := handler.Handle(context.Background(), request)
-
-	require.NoError(t, err)
-	assert.Equal(t, http.StatusBadRequest, response.StatusCode)
-
-	var errResp errorResponse
-	err = json.Unmarshal([]byte(response.Body), &errResp)
-	require.NoError(t, err)
-	assert.Equal(t, "walletName is required", errResp.Message)
-}
-
 func TestHandle_MissingCategoryID(t *testing.T) {
 	payload := createTransactionRequest{
-		WalletID:     "wallet-123",
-		WalletName:   "Main Wallet",
-		CategoryID:   "", // missing
-		CategoryName: "Food",
-		Currency:     "USD",
-		Type:         "expense",
-		Amount:       25.50,
-		Date:         "2025-05-17",
+		WalletID:   "wallet-123",
+		CategoryID: "", // missing
+		Currency:   "USD",
+		Type:       "expense",
+		Amount:     25.50,
+		Date:       "2025-05-17",
 	}
 
 	body, err := json.Marshal(payload)
 	require.NoError(t, err)
 
 	mockService := &MockTransactionService{}
-	handler := &createTransactionLambda{service: mockService}
+	handler := newMockTestHandler(mockService)
 	request := events.APIGatewayV2HTTPRequest{
 		Body: string(body),
 	}
@@ -207,55 +173,21 @@ func TestHandle_MissingCategoryID(t *testing.T) {
 	assert.Equal(t, "categoryId is required", errResp.Message)
 }
 
-func TestHandle_MissingCategoryName(t *testing.T) {
-	payload := createTransactionRequest{
-		WalletID:     "wallet-123",
-		WalletName:   "Main Wallet",
-		CategoryID:   "cat-456",
-		CategoryName: "", // missing
-		Currency:     "USD",
-		Type:         "expense",
-		Amount:       25.50,
-		Date:         "2025-05-17",
-	}
-
-	body, err := json.Marshal(payload)
-	require.NoError(t, err)
-
-	mockService := &MockTransactionService{}
-	handler := &createTransactionLambda{service: mockService}
-	request := events.APIGatewayV2HTTPRequest{
-		Body: string(body),
-	}
-
-	response, err := handler.Handle(context.Background(), request)
-
-	require.NoError(t, err)
-	assert.Equal(t, http.StatusBadRequest, response.StatusCode)
-
-	var errResp errorResponse
-	err = json.Unmarshal([]byte(response.Body), &errResp)
-	require.NoError(t, err)
-	assert.Equal(t, "categoryName is required", errResp.Message)
-}
-
 func TestHandle_MissingCurrency(t *testing.T) {
 	payload := createTransactionRequest{
-		WalletID:     "wallet-123",
-		WalletName:   "Main Wallet",
-		CategoryID:   "cat-456",
-		CategoryName: "Food",
-		Currency:     "", // missing
-		Type:         "expense",
-		Amount:       25.50,
-		Date:         "2025-05-17",
+		WalletID:   "wallet-123",
+		CategoryID: "cat-456",
+		Currency:   "", // missing
+		Type:       "expense",
+		Amount:     25.50,
+		Date:       "2025-05-17",
 	}
 
 	body, err := json.Marshal(payload)
 	require.NoError(t, err)
 
 	mockService := &MockTransactionService{}
-	handler := &createTransactionLambda{service: mockService}
+	handler := newMockTestHandler(mockService)
 	request := events.APIGatewayV2HTTPRequest{
 		Body: string(body),
 	}
@@ -273,21 +205,19 @@ func TestHandle_MissingCurrency(t *testing.T) {
 
 func TestHandle_MissingType(t *testing.T) {
 	payload := createTransactionRequest{
-		WalletID:     "wallet-123",
-		WalletName:   "Main Wallet",
-		CategoryID:   "cat-456",
-		CategoryName: "Food",
-		Currency:     "USD",
-		Type:         "", // missing
-		Amount:       25.50,
-		Date:         "2025-05-17",
+		WalletID:   "wallet-123",
+		CategoryID: "cat-456",
+		Currency:   "USD",
+		Type:       "", // missing
+		Amount:     25.50,
+		Date:       "2025-05-17",
 	}
 
 	body, err := json.Marshal(payload)
 	require.NoError(t, err)
 
 	mockService := &MockTransactionService{}
-	handler := &createTransactionLambda{service: mockService}
+	handler := newMockTestHandler(mockService)
 	request := events.APIGatewayV2HTTPRequest{
 		Body: string(body),
 	}
@@ -305,21 +235,19 @@ func TestHandle_MissingType(t *testing.T) {
 
 func TestHandle_MissingAmount(t *testing.T) {
 	payload := createTransactionRequest{
-		WalletID:     "wallet-123",
-		WalletName:   "Main Wallet",
-		CategoryID:   "cat-456",
-		CategoryName: "Food",
-		Currency:     "USD",
-		Type:         "expense",
-		Amount:       0, // missing
-		Date:         "2025-05-17",
+		WalletID:   "wallet-123",
+		CategoryID: "cat-456",
+		Currency:   "USD",
+		Type:       "expense",
+		Amount:     0, // missing
+		Date:       "2025-05-17",
 	}
 
 	body, err := json.Marshal(payload)
 	require.NoError(t, err)
 
 	mockService := &MockTransactionService{}
-	handler := &createTransactionLambda{service: mockService}
+	handler := newMockTestHandler(mockService)
 	request := events.APIGatewayV2HTTPRequest{
 		Body: string(body),
 	}
@@ -337,21 +265,19 @@ func TestHandle_MissingAmount(t *testing.T) {
 
 func TestHandle_MissingDate(t *testing.T) {
 	payload := createTransactionRequest{
-		WalletID:     "wallet-123",
-		WalletName:   "Main Wallet",
-		CategoryID:   "cat-456",
-		CategoryName: "Food",
-		Currency:     "USD",
-		Type:         "expense",
-		Amount:       25.50,
-		Date:         "", // missing
+		WalletID:   "wallet-123",
+		CategoryID: "cat-456",
+		Currency:   "USD",
+		Type:       "expense",
+		Amount:     25.50,
+		Date:       "", // missing
 	}
 
 	body, err := json.Marshal(payload)
 	require.NoError(t, err)
 
 	mockService := &MockTransactionService{}
-	handler := &createTransactionLambda{service: mockService}
+	handler := newMockTestHandler(mockService)
 	request := events.APIGatewayV2HTTPRequest{
 		Body: string(body),
 	}
@@ -369,21 +295,19 @@ func TestHandle_MissingDate(t *testing.T) {
 
 func TestHandle_InvalidDateFormat(t *testing.T) {
 	payload := createTransactionRequest{
-		WalletID:     "wallet-123",
-		WalletName:   "Main Wallet",
-		CategoryID:   "cat-456",
-		CategoryName: "Food",
-		Currency:     "USD",
-		Type:         "expense",
-		Amount:       25.50,
-		Date:         "invalid-date", // invalid format
+		WalletID:   "wallet-123",
+		CategoryID: "cat-456",
+		Currency:   "USD",
+		Type:       "expense",
+		Amount:     25.50,
+		Date:       "invalid-date", // invalid format
 	}
 
 	body, err := json.Marshal(payload)
 	require.NoError(t, err)
 
 	mockService := &MockTransactionService{}
-	handler := &createTransactionLambda{service: mockService}
+	handler := newMockTestHandler(mockService)
 	request := events.APIGatewayV2HTTPRequest{
 		Body: string(body),
 	}
@@ -401,14 +325,12 @@ func TestHandle_InvalidDateFormat(t *testing.T) {
 
 func TestHandle_ServiceError(t *testing.T) {
 	payload := createTransactionRequest{
-		WalletID:     "wallet-123",
-		WalletName:   "Main Wallet",
-		CategoryID:   "cat-456",
-		CategoryName: "Food",
-		Currency:     "USD",
-		Type:         "expense",
-		Amount:       25.50,
-		Date:         "2025-05-17",
+		WalletID:   "wallet-123",
+		CategoryID: "cat-456",
+		Currency:   "USD",
+		Type:       "expense",
+		Amount:     25.50,
+		Date:       "2025-05-17",
 	}
 
 	body, err := json.Marshal(payload)
@@ -420,7 +342,7 @@ func TestHandle_ServiceError(t *testing.T) {
 		},
 	}
 
-	handler := &createTransactionLambda{service: mockService}
+	handler := newMockTestHandler(mockService)
 	request := events.APIGatewayV2HTTPRequest{
 		Body: string(body),
 	}
@@ -436,13 +358,53 @@ func TestHandle_ServiceError(t *testing.T) {
 	assert.Equal(t, "database error", errResp.Message)
 }
 
+func TestHandle_WalletNotFoundReturnsNotFound(t *testing.T) {
+	writer := &atomicWriter{}
+	handler := &createTransactionLambda{
+		txService:       atomicTransactionService{},
+		walletService:   atomicWalletService{err: wallet.ErrWalletNotFound},
+		categoryService: atomicCategoryService{},
+		writer:          writer,
+		tableName:       "items",
+	}
+
+	response, err := handler.Handle(context.Background(), events.APIGatewayV2HTTPRequest{
+		Body: `{"walletId":"missing-wallet","categoryId":"category-1","currency":"THB","type":"expense","amount":10,"date":"2025-05-17"}`,
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusNotFound, response.StatusCode)
+	assert.Contains(t, response.Body, "No wallet match given query")
+	assert.Empty(t, writer.ops)
+}
+
+func TestHandle_CategoryNotFoundReturnsNotFound(t *testing.T) {
+	writer := &atomicWriter{}
+	handler := &createTransactionLambda{
+		txService:       atomicTransactionService{},
+		walletService:   atomicWalletService{},
+		categoryService: atomicCategoryService{err: category.ErrCategoryNotFound},
+		writer:          writer,
+		tableName:       "items",
+	}
+
+	response, err := handler.Handle(context.Background(), events.APIGatewayV2HTTPRequest{
+		Body: `{"walletId":"wallet-1","categoryId":"missing-category","currency":"THB","type":"expense","amount":10,"date":"2025-05-17"}`,
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusNotFound, response.StatusCode)
+	assert.Contains(t, response.Body, "No category match given query")
+	assert.Empty(t, writer.ops)
+}
+
 func TestHandle_ServiceDeadline(t *testing.T) {
 	service := &MockTransactionService{
 		CreateTransactionFunc: func(context.Context, string, string, string, string, string, string, string, string, float64, time.Time, string) error {
 			return context.DeadlineExceeded
 		},
 	}
-	response, err := (&createTransactionLambda{service: service}).Handle(context.Background(), events.APIGatewayV2HTTPRequest{
+	response, err := newMockTestHandler(service).Handle(context.Background(), events.APIGatewayV2HTTPRequest{
 		Body: `{"walletId":"w","walletName":"wallet","categoryId":"c","categoryName":"category","currency":"THB","type":"expense","amount":1,"date":"2025-05-17"}`,
 	})
 	require.NoError(t, err)
@@ -450,7 +412,7 @@ func TestHandle_ServiceDeadline(t *testing.T) {
 }
 
 func TestHandle_InvalidTransactionType(t *testing.T) {
-	response, err := (&createTransactionLambda{service: transaction.NewService(nil)}).Handle(context.Background(), events.APIGatewayV2HTTPRequest{
+	response, err := newTestHandler(transaction.NewService(nil)).Handle(context.Background(), events.APIGatewayV2HTTPRequest{
 		Body: `{"walletId":"w","walletName":"wallet","categoryId":"c","categoryName":"category","currency":"THB","type":"invalid","amount":1,"date":"2025-05-17"}`,
 	})
 	require.NoError(t, err)
@@ -459,14 +421,12 @@ func TestHandle_InvalidTransactionType(t *testing.T) {
 
 func TestHandle_ValidDateInRFC3339Format(t *testing.T) {
 	payload := createTransactionRequest{
-		WalletID:     "wallet-123",
-		WalletName:   "Main Wallet",
-		CategoryID:   "cat-456",
-		CategoryName: "Food",
-		Currency:     "USD",
-		Type:         "expense",
-		Amount:       25.50,
-		Date:         "2025-05-17T10:30:00Z",
+		WalletID:   "wallet-123",
+		CategoryID: "cat-456",
+		Currency:   "USD",
+		Type:       "expense",
+		Amount:     25.50,
+		Date:       "2025-05-17T10:30:00Z",
 	}
 
 	body, err := json.Marshal(payload)
@@ -478,7 +438,7 @@ func TestHandle_ValidDateInRFC3339Format(t *testing.T) {
 		},
 	}
 
-	handler := &createTransactionLambda{service: mockService}
+	handler := newMockTestHandler(mockService)
 	request := events.APIGatewayV2HTTPRequest{
 		Body: string(body),
 	}
@@ -491,14 +451,12 @@ func TestHandle_ValidDateInRFC3339Format(t *testing.T) {
 
 func TestValidatePayload_AllFieldsValid(t *testing.T) {
 	payload := createTransactionRequest{
-		WalletID:     "wallet-123",
-		WalletName:   "Main Wallet",
-		CategoryID:   "cat-456",
-		CategoryName: "Food",
-		Currency:     "USD",
-		Type:         "expense",
-		Amount:       25.50,
-		Date:         "2025-05-17",
+		WalletID:   "wallet-123",
+		CategoryID: "cat-456",
+		Currency:   "USD",
+		Type:       "expense",
+		Amount:     25.50,
+		Date:       "2025-05-17",
 	}
 
 	err := validatePayload(payload)
@@ -514,30 +472,14 @@ func TestValidatePayload_WhitespaceIsInvalid(t *testing.T) {
 		{
 			name: "whitespace walletId",
 			payload: createTransactionRequest{
-				WalletID:     "   ",
-				WalletName:   "Main Wallet",
-				CategoryID:   "cat-456",
-				CategoryName: "Food",
-				Currency:     "USD",
-				Type:         "expense",
-				Amount:       25.50,
-				Date:         "2025-05-17",
+				WalletID:   "   ",
+				CategoryID: "cat-456",
+				Currency:   "USD",
+				Type:       "expense",
+				Amount:     25.50,
+				Date:       "2025-05-17",
 			},
 			expected: "walletId is required",
-		},
-		{
-			name: "whitespace walletName",
-			payload: createTransactionRequest{
-				WalletID:     "wallet-123",
-				WalletName:   "   ",
-				CategoryID:   "cat-456",
-				CategoryName: "Food",
-				Currency:     "USD",
-				Type:         "expense",
-				Amount:       25.50,
-				Date:         "2025-05-17",
-			},
-			expected: "walletName is required",
 		},
 	}
 
@@ -551,5 +493,36 @@ func TestValidatePayload_WhitespaceIsInvalid(t *testing.T) {
 }
 
 func (m *MockTransactionService) PrepareCreateTransaction(walletID string, walletName string, categoryID string, categoryName string, description string, currency string, imageURL string, txType string, amount float64, date time.Time, ownerID string) (clients.WriteOp, error) {
-	return clients.WriteOp{}, nil
+	if m.PrepareCreateTransactionFunc != nil {
+		return m.PrepareCreateTransactionFunc(walletID, walletName, categoryID, categoryName, description, currency, imageURL, txType, amount, date, ownerID)
+	}
+	if m.CreateTransactionFunc != nil {
+		if err := m.CreateTransactionFunc(context.Background(), walletID, walletName, categoryID, categoryName, description, currency, imageURL, txType, amount, date, ownerID); err != nil {
+			return clients.WriteOp{}, err
+		}
+	}
+	return clients.WriteOp{Kind: clients.WritePut, Table: "items"}, nil
+}
+
+type mockTransactionServiceAdapter struct {
+	transaction.Service
+	mock *MockTransactionService
+}
+
+func (adapter mockTransactionServiceAdapter) PrepareCreateTransaction(walletID, walletName, categoryID, categoryName, description, currency, imageURL, txType string, amount float64, date time.Time, ownerID string) (clients.WriteOp, error) {
+	return adapter.mock.PrepareCreateTransaction(walletID, walletName, categoryID, categoryName, description, currency, imageURL, txType, amount, date, ownerID)
+}
+
+func newTestHandler(service transaction.Service) *createTransactionLambda {
+	return &createTransactionLambda{
+		txService:       service,
+		walletService:   atomicWalletService{},
+		categoryService: atomicCategoryService{},
+		writer:          &atomicWriter{},
+		tableName:       "items",
+	}
+}
+
+func newMockTestHandler(service *MockTransactionService) *createTransactionLambda {
+	return newTestHandler(mockTransactionServiceAdapter{mock: service})
 }

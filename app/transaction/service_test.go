@@ -15,6 +15,7 @@ import (
 // mockTransactionRepository implements TransactionRepository for testing.
 type mockTransactionRepository struct {
 	createTransactionFn          func(ctx context.Context, transaction *Transaction) error
+	prepareCreateTransactionFn   func(transaction *Transaction) clients.WriteOp
 	getTransactionFn             func(ctx context.Context, ownerID string, transactionID string) (*Transaction, error)
 	listTransactionsOfSubModelFn func(ctx context.Context, subModelName string, targetID string, ownerID string, fromDate time.Time, toDate time.Time, cursor string, limit int32) ([]Transaction, string, error)
 	editTransactionFn            func(ctx context.Context, ownerID string, transactionID string, changedFields map[string]any) error
@@ -95,7 +96,7 @@ func TestPrepareCreateTransactionSuccess(t *testing.T) {
 	service := NewService(&mockTransactionRepository{})
 	testDate := time.Date(2026, time.April, 15, 10, 0, 0, 0, time.UTC)
 
-	op, err := service.PrepareCreateTransaction(
+	created, op, err := service.PrepareCreateTransaction(
 		"wallet-1",
 		"My Wallet",
 		"category-1",
@@ -114,6 +115,7 @@ func TestPrepareCreateTransactionSuccess(t *testing.T) {
 	assert.Equal(t, "transactions", op.Table)
 	tx, ok := op.Item.(*Transaction)
 	require.True(t, ok, "item type = %T, want *Transaction", op.Item)
+	assert.Equal(t, *tx, created)
 	assert.Equal(t, 100.0, tx.Amount)
 	assert.Equal(t, "USD", tx.Currency)
 	assert.Equal(t, "wallet-1", tx.WalletID)
@@ -128,7 +130,7 @@ func TestPrepareCreateTransactionInvalidType(t *testing.T) {
 	service := NewService(&mockTransactionRepository{})
 	testDate := time.Date(2026, time.April, 15, 10, 0, 0, 0, time.UTC)
 
-	op, err := service.PrepareCreateTransaction(
+	created, op, err := service.PrepareCreateTransaction(
 		"wallet-1",
 		"My Wallet",
 		"category-1",
@@ -143,7 +145,28 @@ func TestPrepareCreateTransactionInvalidType(t *testing.T) {
 	)
 
 	require.Error(t, err)
+	assert.Equal(t, Transaction{}, created)
 	assert.Equal(t, clients.WriteOp{}, op)
+}
+
+func TestPrepareCreateTransactionReturnsRepositoryChanges(t *testing.T) {
+	service := NewService(&mockTransactionRepository{
+		prepareCreateTransactionFn: func(tx *Transaction) clients.WriteOp {
+			tx.PK = "repository-populated"
+			return clients.WriteOp{Item: tx}
+		},
+	})
+
+	created, op, err := service.PrepareCreateTransaction(
+		"wallet-1", "My Wallet", "category-1", "Groceries", "", "USD", "",
+		"expense", 100, time.Date(2026, time.April, 15, 10, 0, 0, 0, time.UTC), "user-1",
+	)
+
+	require.NoError(t, err)
+	tx, ok := op.Item.(*Transaction)
+	require.True(t, ok)
+	assert.Equal(t, *tx, created)
+	assert.Equal(t, "repository-populated", created.PK)
 }
 
 func TestCreateTransactionInvalidType(t *testing.T) {
@@ -536,5 +559,8 @@ func TestDeleteTransactionDelegatesToRepository(t *testing.T) {
 }
 
 func (m *mockTransactionRepository) PrepareCreateTransaction(transaction *Transaction) clients.WriteOp {
+	if m.prepareCreateTransactionFn != nil {
+		return m.prepareCreateTransactionFn(transaction)
+	}
 	return clients.WriteOp{Kind: clients.WritePut, Table: "transactions", Item: transaction}
 }

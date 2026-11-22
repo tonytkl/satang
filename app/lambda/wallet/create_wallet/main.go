@@ -83,7 +83,7 @@ func (handler *createWalletLambda) Handle(ctx context.Context, request events.AP
 	ops := []clients.WriteOp{walletOp}
 
 	if payload.Balance != 0 {
-		transactionOp, err := handler.transactionService.PrepareCreateTransaction(
+		_, transactionOp, err := handler.transactionService.PrepareCreateTransaction(
 			createdWallet.ID,
 			createdWallet.Name,
 			// TODO: Query actual category ID

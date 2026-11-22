@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -21,7 +22,7 @@ import (
 // MockTransactionService is a mock implementation of TransactionService
 type MockTransactionService struct {
 	CreateTransactionFunc        func(ctx context.Context, walletID, walletName, categoryID, categoryName, description, currency, imageURL, transactionType string, amount float64, date time.Time, ownerID string) error
-	PrepareCreateTransactionFunc func(walletID, walletName, categoryID, categoryName, description, currency, imageURL, transactionType string, amount float64, date time.Time, ownerID string) (clients.WriteOp, error)
+	PrepareCreateTransactionFunc func(walletID, walletName, categoryID, categoryName, description, currency, imageURL, transactionType string, amount float64, date time.Time, ownerID string) (transaction.Transaction, clients.WriteOp, error)
 	GetTransactionFunc           func(ctx context.Context, transactionID string) (*transaction.Transaction, error)
 }
 
@@ -93,6 +94,92 @@ func TestHandle_ValidPayload(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusCreated, response.StatusCode)
+	var created transaction.TransactionRead
+	require.NoError(t, json.Unmarshal([]byte(response.Body), &created))
+	assert.NotEmpty(t, created.ID)
+	assert.Equal(t, payload.WalletID, created.WalletID)
+	assert.Equal(t, payload.CategoryID, created.CategoryID)
+	assert.Equal(t, transaction.TransactionTypeExpense, created.Type)
+	assert.Equal(t, payload.Amount, created.Amount)
+}
+
+func TestHandle_ReturnsCreatedTransaction(t *testing.T) {
+	description := "Lunch"
+	imageURL := "https://example.com/image.jpg"
+	date := time.Date(2025, time.May, 17, 0, 0, 0, 0, time.UTC)
+	createdAt := time.Date(2025, time.May, 18, 12, 0, 0, 0, time.UTC)
+	updatedAt := createdAt.Add(time.Minute)
+	created := transaction.Transaction{
+		ID:           "tx-123",
+		WalletID:     "wallet-123",
+		WalletName:   "Main",
+		CategoryID:   "cat-456",
+		CategoryName: "Food",
+		Description:  &description,
+		Currency:     "USD",
+		ImageURL:     &imageURL,
+		Type:         transaction.TransactionTypeExpense,
+		Amount:       25.50,
+		Date:         date,
+		OwnerID:      "1",
+		CreatedAt:    createdAt,
+		UpdatedAt:    updatedAt,
+	}
+	service := &MockTransactionService{
+		PrepareCreateTransactionFunc: func(walletID, walletName, categoryID, categoryName, description, currency, imageURL, txType string, amount float64, date time.Time, ownerID string) (transaction.Transaction, clients.WriteOp, error) {
+			return created, clients.WriteOp{Kind: clients.WritePut, Table: "items", Item: &created}, nil
+		},
+	}
+	writer := &atomicWriter{}
+	handler := newMockTestHandler(service)
+	handler.writer = writer
+
+	response, err := handler.Handle(context.Background(), events.APIGatewayV2HTTPRequest{
+		Body: `{"walletId":"wallet-123","categoryId":"cat-456","description":"Lunch","currency":"USD","imageURL":"https://example.com/image.jpg","type":"expense","amount":25.5,"date":"2025-05-17"}`,
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusCreated, response.StatusCode)
+	var got transaction.TransactionRead
+	require.NoError(t, json.Unmarshal([]byte(response.Body), &got))
+	assert.Equal(t, transaction.TransactionRead{
+		ID:           "tx-123",
+		WalletID:     "wallet-123",
+		WalletName:   "Main",
+		CategoryID:   "cat-456",
+		CategoryName: "Food",
+		Description:  &description,
+		Currency:     "USD",
+		ImageURL:     &imageURL,
+		Type:         transaction.TransactionTypeExpense,
+		Amount:       25.50,
+		Date:         date,
+		OwnerID:      "1",
+		CreatedAt:    createdAt,
+		UpdatedAt:    updatedAt,
+	}, got)
+	require.Len(t, writer.ops, 3)
+	assert.Equal(t, &created, writer.ops[2].Item)
+}
+
+func TestHandle_InvalidCreatedTransactionDoesNotWrite(t *testing.T) {
+	writer := &atomicWriter{}
+	service := &MockTransactionService{
+		PrepareCreateTransactionFunc: func(string, string, string, string, string, string, string, string, float64, time.Time, string) (transaction.Transaction, clients.WriteOp, error) {
+			return transaction.Transaction{}, clients.WriteOp{Kind: clients.WritePut}, nil
+		},
+	}
+	handler := newMockTestHandler(service)
+	handler.writer = writer
+
+	response, err := handler.Handle(context.Background(), events.APIGatewayV2HTTPRequest{
+		Body: `{"walletId":"w","categoryId":"c","currency":"THB","type":"expense","amount":1,"date":"2025-05-17"}`,
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusInternalServerError, response.StatusCode)
+	assert.Contains(t, response.Body, "transaction response schema validation failed")
+	assert.Empty(t, writer.ops)
 }
 
 func TestHandle_InvalidJSONPayload(t *testing.T) {
@@ -492,16 +579,17 @@ func TestValidatePayload_WhitespaceIsInvalid(t *testing.T) {
 	}
 }
 
-func (m *MockTransactionService) PrepareCreateTransaction(walletID string, walletName string, categoryID string, categoryName string, description string, currency string, imageURL string, txType string, amount float64, date time.Time, ownerID string) (clients.WriteOp, error) {
+func (m *MockTransactionService) PrepareCreateTransaction(walletID string, walletName string, categoryID string, categoryName string, description string, currency string, imageURL string, txType string, amount float64, date time.Time, ownerID string) (transaction.Transaction, clients.WriteOp, error) {
 	if m.PrepareCreateTransactionFunc != nil {
 		return m.PrepareCreateTransactionFunc(walletID, walletName, categoryID, categoryName, description, currency, imageURL, txType, amount, date, ownerID)
 	}
 	if m.CreateTransactionFunc != nil {
 		if err := m.CreateTransactionFunc(context.Background(), walletID, walletName, categoryID, categoryName, description, currency, imageURL, txType, amount, date, ownerID); err != nil {
-			return clients.WriteOp{}, err
+			return transaction.Transaction{}, clients.WriteOp{}, err
 		}
 	}
-	return clients.WriteOp{Kind: clients.WritePut, Table: "items"}, nil
+	created := transaction.NewTransaction(walletID, walletName, categoryID, categoryName, description, currency, imageURL, transaction.TransactionType(strings.ToUpper(txType)), amount, date, ownerID)
+	return *created, clients.WriteOp{Kind: clients.WritePut, Table: "items", Item: created}, nil
 }
 
 type mockTransactionServiceAdapter struct {
@@ -509,7 +597,7 @@ type mockTransactionServiceAdapter struct {
 	mock *MockTransactionService
 }
 
-func (adapter mockTransactionServiceAdapter) PrepareCreateTransaction(walletID, walletName, categoryID, categoryName, description, currency, imageURL, txType string, amount float64, date time.Time, ownerID string) (clients.WriteOp, error) {
+func (adapter mockTransactionServiceAdapter) PrepareCreateTransaction(walletID, walletName, categoryID, categoryName, description, currency, imageURL, txType string, amount float64, date time.Time, ownerID string) (transaction.Transaction, clients.WriteOp, error) {
 	return adapter.mock.PrepareCreateTransaction(walletID, walletName, categoryID, categoryName, description, currency, imageURL, txType, amount, date, ownerID)
 }
 

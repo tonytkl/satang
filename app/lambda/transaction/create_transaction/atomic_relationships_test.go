@@ -47,8 +47,9 @@ type atomicTransactionService struct {
 	transaction.Service
 }
 
-func (atomicTransactionService) PrepareCreateTransaction(walletID, walletName, categoryID, categoryName, description, currency, imageURL, txType string, amount float64, date time.Time, ownerID string) (clients.WriteOp, error) {
-	return clients.WriteOp{
+func (atomicTransactionService) PrepareCreateTransaction(walletID, walletName, categoryID, categoryName, description, currency, imageURL, txType string, amount float64, date time.Time, ownerID string) (transaction.Transaction, clients.WriteOp, error) {
+	created := transaction.NewTransaction(walletID, walletName, categoryID, categoryName, description, currency, imageURL, transaction.TransactionTypeExpense, amount, date, ownerID)
+	return *created, clients.WriteOp{
 		Kind:  clients.WritePut,
 		Table: "items",
 		Item:  map[string]string{"walletID": walletID, "categoryID": categoryID},

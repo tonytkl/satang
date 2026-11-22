@@ -115,7 +115,7 @@ func (handler *createTransactionLambda) Handle(ctx context.Context, request even
 		return utils.JsonResponse(http.StatusInternalServerError, errorResponse{Message: "Failed to query category"})
 	}
 
-	transactionOp, err := handler.txService.PrepareCreateTransaction(
+	createdTransaction, transactionOp, err := handler.txService.PrepareCreateTransaction(
 		payload.WalletID,
 		walletObj.Name,
 		payload.CategoryID,
@@ -130,6 +130,11 @@ func (handler *createTransactionLambda) Handle(ctx context.Context, request even
 	)
 	if err != nil {
 		return utils.JsonResponse(utils.ErrorStatusCode(err), errorResponse{Message: err.Error()})
+	}
+
+	response, err := transaction.BuildTransactionRead([]transaction.Transaction{createdTransaction})
+	if err != nil {
+		return utils.JsonResponse(http.StatusInternalServerError, errorResponse{Message: err.Error()})
 	}
 
 	walletCheck := clients.WriteOp{
@@ -168,9 +173,7 @@ func (handler *createTransactionLambda) Handle(ctx context.Context, request even
 		return utils.JsonResponse(utils.ErrorStatusCode(err), errorResponse{Message: err.Error()})
 	}
 
-	return events.APIGatewayV2HTTPResponse{
-		StatusCode: http.StatusCreated,
-	}, nil
+	return utils.JsonResponse(http.StatusCreated, response[0])
 }
 
 func validatePayload(payload createTransactionRequest) error {
